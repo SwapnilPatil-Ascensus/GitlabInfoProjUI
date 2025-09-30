@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+  frontend:
+    build: ./ui
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./ui:/app
+    stdin_open: true
+    tty: true
