@@ -23,8 +23,8 @@ See `docs/QUICK_START.md` for a step-by-step guide.
 1. Clone the repo and install dependencies for backend and frontend
 
 2. Set your `GITLAB_TOKEN` environment variable (PowerShell):
-  - For the current session: `$env:GITLAB_TOKEN="glpat-z9nrQZYKdtRTUIz8sOLm1G86MQp1OmNxNTY3Cw.01.1200pc4p6"`
-  - For all future sessions: `setx GITLAB_TOKEN "glpat-z9nrQZYKdtRTUIz8sOLm1G86MQp1OmNxNTY3Cw.01.1200pc4p6"` (then restart terminal)
+  - For the current session: `$env:GITLAB_TOKEN="glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"`
+  - For all future sessions: `setx GITLAB_TOKEN "glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"` (then restart terminal)
 3. Start backend (port 8000) and frontend (port 3000) as shown below
 4. Open http://localhost:3000 in your browser
 
@@ -38,13 +38,13 @@ See `docs/QUICK_START.md` for a step-by-step guide.
 ```powershell
 cd backend
 venv\Scripts\activate
-$env:GITLAB_TOKEN="glpat-z9nrQZYKdtRTUIz8sOLm1G86MQp1OmNxNTY3Cw.01.1200pc4p6"
+$env:GITLAB_TOKEN="glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## Permanent Token (Optional)
 ```powershell
-setx GITLAB_TOKEN "glpat-z9nrQZYKdtRTUIz8sOLm1G86MQp1OmNxNTY3Cw.01.1200pc4p6"
+setx GITLAB_TOKEN "glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"
 # Restart your terminal before running the backend
 ```
 

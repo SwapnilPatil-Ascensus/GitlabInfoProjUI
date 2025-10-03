@@ -22,11 +22,11 @@ python -m venv venv
 venv\Scripts\activate  # On Windows
 pip install -r requirements.txt
 # Set your GitLab token for the current session (PowerShell):
-$env:GITLAB_TOKEN="glpat-z9nrQZYKdtRTUIz8sOLm1G86MQp1OmNxNTY3Cw.01.1200pc4p6"
+$env:GITLAB_TOKEN="glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 # To set the token permanently (for all future sessions), run this in PowerShell:
-# setx GITLAB_TOKEN "glpat-z9nrQZYKdtRTUIz8sOLm1G86MQp1OmNxNTY3Cw.01.1200pc4p6"
+# setx GITLAB_TOKEN "glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"
 ```
 
 ### 3. Install and Start the Frontend
@@ -80,8 +80,8 @@ If you encounter issues, follow these steps before asking for help or running th
 
 **Issue:** `Token environment variable 'GITLAB_TOKEN' not set.`
 - **Solution:**
-  - Set the token for the current session: `$env:GITLAB_TOKEN="glpat-z9nrQZYKdtRTUIz8sOLm1G86MQp1OmNxNTY3Cw.01.1200pc4p6"`
-  - Or set it permanently: `setx GITLAB_TOKEN "glpat-z9nrQZYKdtRTUIz8sOLm1G86MQp1OmNxNTY3Cw.01.1200pc4p6"` (then restart your terminal)
+  - Set the token for the current session: `$env:GITLAB_TOKEN="glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"`
+  - Or set it permanently: `setx GITLAB_TOKEN "glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"` (then restart your terminal)
   - Always set the token before running the backend.
 
 **Issue:** `net::ERR_CONNECTION_REFUSED` or UI shows `Network Error`

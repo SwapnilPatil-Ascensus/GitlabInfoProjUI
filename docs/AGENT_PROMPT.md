@@ -16,8 +16,8 @@ Build a modern, modular GitLab analytics/reporting tool with:
    - Each endpoint should call modular analytics/reporting logic (separate Python modules).
    - Add CORS middleware for `http://localhost:3000`.
    - Use environment variable `GITLAB_TOKEN` for GitLab API access.
-   - For the current session (PowerShell): `$env:GITLAB_TOKEN="glpat-z9nrQZYKdtRTUIz8sOLm1G86MQp1OmNxNTY3Cw.01.1200pc4p6"`
-   - For all future sessions: `setx GITLAB_TOKEN "glpat-z9nrQZYKdtRTUIz8sOLm1G86MQp1OmNxNTY3Cw.01.1200pc4p6"` (then restart terminal)
+   - For the current session (PowerShell): `$env:GITLAB_TOKEN="glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"`
+   - For all future sessions: `setx GITLAB_TOKEN "glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"` (then restart terminal)
 
 2. **Scaffold the Frontend:**
    - Create a React app in a `ui/` folder using Material-UI.
