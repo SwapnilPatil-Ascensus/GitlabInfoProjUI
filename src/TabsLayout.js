@@ -66,8 +66,14 @@ const StyledCard = styled(Card)(({ theme }) => ({
   width: '100%',
   marginBottom: theme.spacing(3),
   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  animation: 'fadeIn 0.5s ease-out',
+  '@keyframes fadeIn': {
+    from: { opacity: 0, transform: 'translateY(10px)' },
+    to: { opacity: 1, transform: 'translateY(0)' },
+  },
   '&:hover': {
-    transform: 'translateY(-2px)',
+    transform: 'translateY(-4px)',
+    boxShadow: theme.shadows[8],
   },
 }));
 
@@ -138,13 +144,14 @@ export default function TabsLayout() {
     setLoading(true);
     setError(null);
     setResult(null);
-    setFilteredResult(null);
+    setFilteredResult(null); // Clear filtered results when generating new data
     const tabKey = currentTab.key;
     
     try {
       const { data } = await apiMap[tabKey](params);
       setResult(data);
-      // Don't set filteredResult here - let SearchFilter handle it
+      // Clear filtered result so displayResult uses the new result
+      setFilteredResult(null);
     } catch (e) {
       const errorMessage = e?.response?.data?.detail || e?.response?.data?.error || e?.message || 'Error fetching data';
       setError({ message: errorMessage, response: e?.response });
@@ -211,6 +218,10 @@ export default function TabsLayout() {
               minHeight: 64,
               fontSize: 15,
               fontWeight: 600,
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+              },
             },
           }}
         >
@@ -317,6 +328,20 @@ export default function TabsLayout() {
               py: 1.5, 
               fontSize: 16, 
               fontWeight: 600,
+              transition: 'all 0.3s ease',
+              transform: 'scale(1)',
+              '&:hover:not(:disabled)': {
+                transform: 'scale(1.05)',
+                boxShadow: 6,
+              },
+              '&:active:not(:disabled)': {
+                transform: 'scale(0.98)',
+              },
+              animation: loading ? 'pulse 1.5s ease-in-out infinite' : 'none',
+              '@keyframes pulse': {
+                '0%, 100%': { opacity: 1 },
+                '50%': { opacity: 0.7 },
+              },
             }}
           >
             {loading ? 'Loading...' : 'Generate'}
@@ -332,8 +357,22 @@ export default function TabsLayout() {
 
       {/* Results Card */}
       {displayResult && !loading && (
-        <Fade in={true} timeout={500}>
-          <StyledCard>
+        <Fade in={true} timeout={600}>
+          <StyledCard
+            sx={{
+              animation: 'slideInUp 0.5s ease-out',
+              '@keyframes slideInUp': {
+                from: {
+                  opacity: 0,
+                  transform: 'translateY(20px)',
+                },
+                to: {
+                  opacity: 1,
+                  transform: 'translateY(0)',
+                },
+              },
+            }}
+          >
             <CardHeader
               title={
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -373,14 +412,18 @@ export default function TabsLayout() {
             />
             <Divider />
             <CardContent>
-              {/* Search Filter */}
-              {displayResult && displayResult.items && displayResult.items.length > 0 && (
+              {/* Search Filter - Always visible when we have results */}
+              {displayResult && displayResult.items && Array.isArray(displayResult.items) && (
                 <SearchFilter
-                  data={displayResult.items}
+                  data={result?.items || displayResult.items}
                   onFiltered={(filteredItems) => {
-                    if (filteredItems) {
-                      setFilteredResult({ ...displayResult, items: filteredItems });
+                    // Always use the original result as base, not displayResult
+                    const originalResult = result || displayResult;
+                    if (filteredItems && Array.isArray(filteredItems)) {
+                      // Update filtered result with filtered items
+                      setFilteredResult({ ...originalResult, items: filteredItems });
                     } else {
+                      // If no filtered items, clear filter to show original
                       setFilteredResult(null);
                     }
                   }}

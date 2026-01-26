@@ -45,7 +45,14 @@ export default function ExportButton({ data, headers, filename, disabled = false
         startIcon={<FileDownloadIcon />}
         onClick={handleClick}
         disabled={disabled}
-        sx={{ borderRadius: 2 }}
+        sx={{ 
+          borderRadius: 2,
+          transition: 'all 0.2s ease',
+          '&:hover:not(:disabled)': {
+            transform: 'translateY(-2px)',
+            boxShadow: 3,
+          },
+        }}
       >
         Export
       </Button>
