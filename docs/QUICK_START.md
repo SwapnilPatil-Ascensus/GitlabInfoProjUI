@@ -15,19 +15,40 @@ cd GitlabInfoProjUI
 ```
 
 ### 2. Install and Start the Backend
+
+**Windows (PowerShell):**
 ```powershell
 cd backend
 python -m venv venv
-
-venv\Scripts\activate  # On Windows
+venv\Scripts\activate
 pip install -r requirements.txt
-# Set your GitLab token for the current session (PowerShell):
-$env:GITLAB_TOKEN="glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
-# To set the token permanently (for all future sessions), run this in PowerShell:
-# setx GITLAB_TOKEN "glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"
+# Set your GitLab token for the current session:
+$env:GITLAB_TOKEN="your-gitlab-token-here"
+
+# Start backend from project root (required for proper imports):
+cd ..
+python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+**Linux/macOS:**
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Set your GitLab token:
+export GITLAB_TOKEN="your-gitlab-token-here"
+
+# Start backend from project root:
+cd ..
+python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+**To set token permanently:**
+- **Windows**: `setx GITLAB_TOKEN "your-token-here"` (then restart terminal)
+- **Linux/macOS**: Add `export GITLAB_TOKEN="your-token-here"` to `~/.bashrc` or `~/.zshrc`
 
 ### 3. Install and Start the Frontend
 ```powershell
@@ -80,9 +101,10 @@ If you encounter issues, follow these steps before asking for help or running th
 
 **Issue:** `Token environment variable 'GITLAB_TOKEN' not set.`
 - **Solution:**
-  - Set the token for the current session: `$env:GITLAB_TOKEN="glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"`
-  - Or set it permanently: `setx GITLAB_TOKEN "glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"` (then restart your terminal)
+  - Set the token for the current session: `$env:GITLAB_TOKEN="your-gitlab-token-here"`
+  - Or set it permanently: `setx GITLAB_TOKEN "your-gitlab-token-here"` (then restart your terminal)
   - Always set the token before running the backend.
+  - Get your token from: https://gitlab.com/-/user_settings/personal_access_tokens
 
 **Issue:** `net::ERR_CONNECTION_REFUSED` or UI shows `Network Error`
 - **Solution:**
