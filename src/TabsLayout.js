@@ -1,8 +1,19 @@
-import { useState } from 'react';
-import { Tabs, Tab, Box, Button, TextField, Typography, MenuItem, Select, InputLabel, FormControl, Card, CardContent, CardHeader, Divider, IconButton, Tooltip } from '@mui/material';
+/**
+ * TabsLayout - Main component with tabbed interface
+ * Refactored with premium UI, search, filter, export, and dark mode support
+ */
+import { useState, useMemo } from 'react';
+import { 
+  Tabs, Tab, Box, Button, TextField, Typography, MenuItem, Select, 
+  InputLabel, FormControl, Card, CardContent, CardHeader, Divider, 
+  IconButton, Tooltip, Chip, Stack, Fade
+} from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { LocalizationProvider, DatePicker } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { styled } from '@mui/material/styles';
+
 import {
   fetchMergeRequests,
   fetchCommits,
@@ -11,45 +22,21 @@ import {
   fetchUsers,
   fetchProject
 } from './api';
-// Project list for dropdown (sorted alphabetically)
-const PROJECTS = [
-  { id: '70748405', name: 'astro-release-versions' },
-  { id: '70014933', name: 'astro-release-versions-old' },
-  { id: '65775762', name: 'featureflag_deployer' },
-  { id: '64906744', name: 'dwcore' },
-  { id: '64504551', name: 'empty' },
-  { id: '62777796', name: 'unite-msc' },
-  { id: '62214898', name: 'uii-releases' },
-  { id: '62168680', name: 'uii-dbpr' },
-  { id: '62141123', name: 'uii-tools-jenkins' },
-  { id: '62141026', name: 'monolith-patching' },
-  { id: '62096647', name: 'uii-devops' },
-  { id: '62084299', name: 'uii-tools' },
-  { id: '62041266', name: 'uii-extras' },
-  { id: '62009521', name: 'tmp-configuration' },
-  { id: '61826050', name: 'monolith-deploy' },
-  { id: '61805298', name: 'monolith-archive' },
-  { id: '61804613', name: 'uii-dw' },
-  { id: '61721493', name: 'deployment-monolith' },
-  { id: '61345786', name: 'release-versions' },
-  { id: '61227191', name: 'monolith' },
-  { id: '71904320', name: 'automation' },
-  { id: '111519404', name: 'qa-automation' },
-  { id: '71904329', name: 'api-test-automation' },
-  { id: '71904346', name: 'automation-shared-resource' },
-  { id: '71904336', name: 'prime-test-automation' },
-  { id: '61183353', name: 'dev-monolith-migration' },
-].sort((a, b) => a.name.localeCompare(b.name));
+import { PROJECTS, TAB_CONFIG } from './utils/constants';
+import { formatResult, getDatePreset } from './utils/formatters';
+import { 
+  getMergeRequestHeaders, getCommitHeaders, getBranchHeaders, 
+  getPipelineHeaders, getUserHeaders 
+} from './utils/exporters';
 
-
-const tabConfig = [
-  { label: 'Merge Requests', key: 'mergeRequests', params: ['project_id', 'start_date', 'end_date'] },
-  { label: 'Commits', key: 'commits', params: ['project_id', 'start_date', 'end_date'] },
-  { label: 'Branches', key: 'branches', params: ['project_id'] },
-  { label: 'Pipelines', key: 'pipelines', params: ['project_id'] },
-  { label: 'Users', key: 'users', params: ['project_id'] },
-  { label: 'Project', key: 'project', params: ['project_id'] },
-];
+// Components
+import InfoTooltip from './components/InfoTooltip';
+import SearchFilter from './components/SearchFilter';
+import ExportButton from './components/ExportButton';
+import DatePresetSelector from './components/DatePresetSelector';
+import ErrorAlert from './components/ErrorAlert';
+import LoadingSpinner from './components/LoadingSpinner';
+import DarkModeToggle from './components/DarkModeToggle';
 
 const apiMap = {
   mergeRequests: fetchMergeRequests,
@@ -60,74 +47,209 @@ const apiMap = {
   project: fetchProject,
 };
 
+const StyledTabsContainer = styled(Box)(({ theme }) => ({
+  width: '100%',
+  marginBottom: theme.spacing(3),
+  '& .MuiTabs-root': {
+    backgroundColor: theme.palette.mode === 'dark' 
+      ? 'rgba(30, 41, 59, 0.8)' 
+      : 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 16,
+    padding: theme.spacing(1),
+    boxShadow: theme.palette.mode === 'dark'
+      ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)'
+      : '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+  },
+}));
+
+const StyledCard = styled(Card)(({ theme }) => ({
+  width: '100%',
+  marginBottom: theme.spacing(3),
+  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+  '&:hover': {
+    transform: 'translateY(-2px)',
+  },
+}));
+
 export default function TabsLayout() {
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState(0);
   const [params, setParams] = useState({});
   const [result, setResult] = useState(null);
+  const [filteredResult, setFilteredResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedPreset, setSelectedPreset] = useState(null);
+
+  const currentTab = TAB_CONFIG[tab];
+  // Use filtered result if available, otherwise use original result
+  const displayResult = filteredResult || result;
+
+  // Get export headers based on current tab
+  const getExportHeaders = () => {
+    switch (currentTab.key) {
+      case 'mergeRequests':
+        return getMergeRequestHeaders();
+      case 'commits':
+        return getCommitHeaders();
+      case 'branches':
+        return getBranchHeaders();
+      case 'pipelines':
+        return getPipelineHeaders();
+      case 'users':
+        return getUserHeaders();
+      default:
+        return [];
+    }
+  };
+
+  // Get search fields based on current tab
+  const getSearchFields = () => {
+    switch (currentTab.key) {
+      case 'mergeRequests':
+        return ['title', 'author.name', 'source_branch', 'target_branch'];
+      case 'commits':
+        return ['title', 'author_name', 'message'];
+      case 'branches':
+        return ['name', 'author_name'];
+      case 'pipelines':
+        return ['ref', 'status'];
+      case 'users':
+        return ['name', 'username'];
+      default:
+        return [];
+    }
+  };
 
   const handleParamChange = (key, value) => {
     setParams((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handlePresetSelect = (dates, presetLabel) => {
+    setParams(prev => ({
+      ...prev,
+      start_date: dates.startDate,
+      end_date: dates.endDate,
+    }));
+    setSelectedPreset(presetLabel);
   };
 
   const handleGenerate = async () => {
     setLoading(true);
     setError(null);
     setResult(null);
-    const tabKey = tabConfig[tab].key;
+    setFilteredResult(null);
+    const tabKey = currentTab.key;
+    
     try {
       const { data } = await apiMap[tabKey](params);
       setResult(data);
+      // Don't set filteredResult here - let SearchFilter handle it
     } catch (e) {
-      setError(e.message || 'Error fetching data');
+      const errorMessage = e?.response?.data?.detail || e?.response?.data?.error || e?.message || 'Error fetching data';
+      setError({ message: errorMessage, response: e?.response });
     } finally {
       setLoading(false);
     }
   };
 
-  const currentTab = tabConfig[tab];
+  const handleCopy = () => {
+    const text = typeof formatResult(displayResult, currentTab, params, PROJECTS) === 'string'
+      ? formatResult(displayResult, currentTab, params, PROJECTS)
+      : '';
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleTabChange = (e, newTab) => {
+    setTab(newTab);
+    setResult(null);
+    setFilteredResult(null);
+    setError(null);
+    setParams({});
+    setSelectedPreset(null);
+  };
+
+  const isFormValid = () => {
+    if (!params.project_id) return false;
+    if (currentTab.params.includes('start_date') && !params.start_date) return false;
+    if (currentTab.params.includes('end_date') && !params.end_date) return false;
+    return true;
+  };
 
   return (
     <Box sx={{
       width: '100%',
-      maxWidth: 1200,
+      maxWidth: 1400,
       minHeight: '100vh',
-      p: { xs: 1, sm: 3, md: 6 },
-      background: '#e0eafc',
+      p: { xs: 2, sm: 3, md: 4 },
       display: 'flex',
-      borderRadius: 3,
-      boxShadow: '10px 12px 12px 0 rgba(104, 139, 139, 0.1)',
       flexDirection: 'column',
       alignItems: 'flex-start',
       margin: '0 auto',
     }}>
-      <Box sx={{ width: '100%', maxWidth: 1200, mb: 3 }}>
+      {/* Header with Dark Mode Toggle */}
+      <Box sx={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" sx={{ fontWeight: 700 }}>
+          GitLab Project Manager
+        </Typography>
+        <DarkModeToggle />
+      </Box>
+
+      {/* Tabs */}
+      <StyledTabsContainer>
         <Tabs
           value={tab}
-          onChange={(e, v) => { setTab(v); setResult(null); setError(null); }}
+          onChange={handleTabChange}
           textColor="primary"
           indicatorColor="primary"
           variant="scrollable"
           scrollButtons="auto"
           sx={{
-            background: '#c1d4fcff',
-            borderRadius: 3,
-            boxShadow: '10px 12px 12px 0 rgba(104, 139, 139, 0.1)',
+            '& .MuiTab-root': {
+              minHeight: 64,
+              fontSize: 15,
+              fontWeight: 600,
+            },
           }}
         >
-          {tabConfig.map((t, i) => <Tab label={t.label} key={t.key} sx={{ fontWeight: 700, fontSize: 18, letterSpacing: 1 }} />)}
+          {TAB_CONFIG.map((t, i) => (
+            <Tab 
+              key={t.key} 
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {t.label}
+                  <InfoTooltip description={t.description} />
+                </Box>
+              } 
+            />
+          ))}
         </Tabs>
-      </Box>
-      <Card sx={{ width: '100%', maxWidth: 1200, mb: 3, borderRadius: 2, boxShadow: '0 4px 16px 0 rgba(34,43,43,0.10)', background: '#d5d8c9ff' }}>
+      </StyledTabsContainer>
+
+      {/* Parameters Card */}
+      <StyledCard>
         <CardHeader
-          title={<Typography variant="h4" sx={{ mb: 1 }}>{currentTab.label} Parameters</Typography>}
+          title={
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="h5">{currentTab.label} Parameters</Typography>
+              <InfoTooltip description={currentTab.description} />
+            </Box>
+          }
         />
         <Divider />
         <CardContent>
           <LocalizationProvider dateAdapter={AdapterDateFns}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 2, width: '100%', maxWidth: 400 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, mb: 3, maxWidth: 500 }}>
+              {/* Date Presets for date range tabs */}
+              {currentTab.params.includes('start_date') && currentTab.params.includes('end_date') && (
+                <DatePresetSelector 
+                  onSelect={handlePresetSelect}
+                  selectedPreset={selectedPreset}
+                />
+              )}
+
               {currentTab.params.map((p) => {
                 if (p === 'project_id') {
                   return (
@@ -139,7 +261,6 @@ export default function TabsLayout() {
                         value={params[p] || ''}
                         label="Project"
                         onChange={e => handleParamChange(p, e.target.value)}
-                        sx={{ fontWeight: 600 }}
                         required
                       >
                         {PROJECTS.map(proj => (
@@ -150,9 +271,7 @@ export default function TabsLayout() {
                   );
                 }
                 if (p === 'start_date' || p === 'end_date') {
-                  // Use same style for both, but bold and colored text
                   const label = p === 'start_date' ? 'Start Date' : 'End Date';
-                  const color = p === 'start_date' ? '#183153' : '#b8860b';
                   return (
                     <DatePicker
                       key={p}
@@ -166,43 +285,8 @@ export default function TabsLayout() {
                       slotProps={{
                         textField: {
                           size: 'small',
-                          value: params[p] || '',
-                          onChange: e => {
-                            handleParamChange(p, e.target.value);
-                          },
                           required: true,
-                          sx: {
-                            width: '100%',
-                            fontWeight: 700,
-                            color,
-                            '& .MuiInputBase-input': { fontWeight: 700, color },
-                            '& .MuiInputLabel-root': { fontWeight: 700, color },
-                          },
-                        }
-                      }}
-                    />
-                  );
-                }
-                if (p.includes('date')) {
-                  // fallback for any other date fields
-                  return (
-                    <DatePicker
-                      key={p}
-                      label={p.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      value={params[p] ? new Date(params[p]) : null}
-                      onChange={date => {
-                        const formatted = date ? new Date(date).toLocaleDateString('en-US') : '';
-                        handleParamChange(p, formatted);
-                      }}
-                      format="MM/dd/yyyy"
-                      slotProps={{
-                        textField: {
-                          size: 'small',
-                          value: params[p] || '',
-                          onChange: e => {
-                            handleParamChange(p, e.target.value);
-                          },
-                          sx: { width: '100%' },
+                          fullWidth: true,
                         }
                       }}
                     />
@@ -215,186 +299,139 @@ export default function TabsLayout() {
                     value={params[p] || ''}
                     onChange={e => handleParamChange(p, e.target.value)}
                     size="small"
-                    sx={{ width: '100%' }}
+                    fullWidth
                   />
                 );
               })}
             </Box>
           </LocalizationProvider>
+          
           <Button
             variant="contained"
             color="primary"
             onClick={handleGenerate}
-            disabled={
-              loading ||
-              (currentTab.params.includes('start_date') && !params.start_date) ||
-              (currentTab.params.includes('end_date') && !params.end_date)
-            }
-            sx={{ mt: 2, px: 5, py: 1.5, fontSize: 18, borderRadius: 3, boxShadow: 3 }}
+            disabled={loading || !isFormValid()}
+            startIcon={loading ? null : <PlayArrowIcon />}
+            sx={{ 
+              px: 4, 
+              py: 1.5, 
+              fontSize: 16, 
+              fontWeight: 600,
+            }}
           >
             {loading ? 'Loading...' : 'Generate'}
           </Button>
         </CardContent>
-      </Card>
-      {error && <Typography color="error" sx={{ mt: 2 }}>{error}</Typography>}
-      {result && (
-        <Card sx={{ width: '100%', maxWidth: 1200, borderRadius: 2, boxShadow: '0 6px 24px 0 rgba(34,43,43,0.13)', background: '#f4f1f5ff', mb: 4 }}>
-          <CardHeader
-            title={<Typography variant="h5" sx={{ color: 'primary.main', fontWeight: 700, fontSize: 22 }}>{currentTab.label} Results</Typography>}
-            action={
-              <Tooltip title="Copy result content" arrow>
-                <IconButton
-                  aria-label="copy"
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      typeof formatResult(result, currentTab, params) === 'string'
-                        ? formatResult(result, currentTab, params)
-                        : ''
-                    );
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1500);
+      </StyledCard>
+
+      {/* Error Alert */}
+      <ErrorAlert error={error} onClose={() => setError(null)} />
+
+      {/* Loading Spinner */}
+      {loading && <LoadingSpinner message="Fetching data from GitLab..." />}
+
+      {/* Results Card */}
+      {displayResult && !loading && (
+        <Fade in={true} timeout={500}>
+          <StyledCard>
+            <CardHeader
+              title={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="h5" color="primary.main" fontWeight={700}>
+                    {currentTab.label} Results
+                  </Typography>
+                  {displayResult.items && (
+                    <Chip 
+                      label={`${displayResult.items.length} items`} 
+                      size="small" 
+                      color="primary"
+                      variant="outlined"
+                    />
+                  )}
+                </Box>
+              }
+              action={
+                <Stack direction="row" spacing={1} alignItems="center">
+                  {displayResult.items && displayResult.items.length > 0 && (
+                    <ExportButton
+                      data={displayResult.items}
+                      headers={getExportHeaders()}
+                      filename={`${currentTab.key}-${params.project_id}`}
+                    />
+                  )}
+                  <Tooltip title={copied ? "Copied!" : "Copy results"} arrow>
+                    <IconButton
+                      aria-label="copy"
+                      onClick={handleCopy}
+                      color={copied ? 'success' : 'default'}
+                    >
+                      <ContentCopyIcon />
+                    </IconButton>
+                  </Tooltip>
+                </Stack>
+              }
+            />
+            <Divider />
+            <CardContent>
+              {/* Search Filter */}
+              {displayResult && displayResult.items && displayResult.items.length > 0 && (
+                <SearchFilter
+                  data={displayResult.items}
+                  onFiltered={(filteredItems) => {
+                    if (filteredItems) {
+                      setFilteredResult({ ...displayResult, items: filteredItems });
+                    } else {
+                      setFilteredResult(null);
+                    }
                   }}
-                  sx={{ ml: 2 }}
-                >
-                  <ContentCopyIcon color={copied ? 'success' : 'action'} />
-                </IconButton>
-              </Tooltip>
-            }
-          />
-          <Divider />
-          <CardContent>
-            <Box sx={{ fontFamily: 'monospace', fontSize: 15, color: '#232b2b', whiteSpace: 'pre-wrap', wordBreak: 'break-word', p: 1 }}>
-              {formatResult(result, currentTab, params)}
-            </Box>
-          </CardContent>
-        </Card>
+                  searchFields={getSearchFields()}
+                  placeholder={`Search ${currentTab.label.toLowerCase()}...`}
+                />
+              )}
+
+              {/* Results Display */}
+              <Box sx={{ 
+                fontFamily: 'monospace', 
+                fontSize: 14, 
+                whiteSpace: 'pre-wrap', 
+                wordBreak: 'break-word',
+                p: 2,
+                borderRadius: 2,
+                backgroundColor: 'background.default',
+                maxHeight: '70vh',
+                overflow: 'auto',
+                '&::-webkit-scrollbar': {
+                  width: '8px',
+                },
+                '&::-webkit-scrollbar-track': {
+                  backgroundColor: 'transparent',
+                },
+                '&::-webkit-scrollbar-thumb': {
+                  backgroundColor: 'rgba(0,0,0,0.2)',
+                  borderRadius: '4px',
+                  '&:hover': {
+                    backgroundColor: 'rgba(0,0,0,0.3)',
+                  },
+                },
+              }}>
+                {formatResult(displayResult, currentTab, params, PROJECTS)}
+              </Box>
+
+              {/* Empty State */}
+              {(!displayResult.items || displayResult.items.length === 0) && (
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <Typography variant="h6" color="text.secondary" gutterBottom>
+                    No results found
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Try adjusting your search or date range
+                  </Typography>
+                </Box>
+              )}
+            </CardContent>
+          </StyledCard>
+        </Fade>
       )}
     </Box>
   );
-}
-
-// Format output as specified
-function formatResult(result, currentTab, params) {
-  // Helper to convert ISO string to EST and format as 'YYYY-MM-DD hh:mm:ss'
-  function formatEST(isoString) {
-    if (!isoString) return '';
-    try {
-      const date = new Date(isoString);
-      // Convert to EST (America/New_York)
-      const options = {
-        timeZone: 'America/New_York',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: false
-      };
-      // Format: MM/DD/YYYY HH:mm:ss
-      const parts = new Intl.DateTimeFormat('en-US', options).formatToParts(date);
-      const get = type => parts.find(p => p.type === type)?.value || '';
-      return `${get('month')}/${get('day')}/${get('year')} ${get('hour')}:${get('minute')}:${get('second')}`;
-    } catch {
-      return isoString;
-    }
-  }
-  // Project name lookup
-  const project = PROJECTS.find(p => p.id === params.project_id);
-  const projectName = project ? project.name : params.project_id;
-  const type = currentTab.label;
-  let dateRange = '';
-  if (params.start_date && params.end_date) {
-    dateRange = `| Date Range: ${params.start_date} - ${params.end_date}`;
-  }
-  let total = '';
-  let statusBreakdown = '';
-  if (Array.isArray(result.items)) {
-    const items = result.items;
-    const openCount = items.filter(item => item.state && item.state.toLowerCase() === 'opened').length;
-    const mergedCount = items.filter(item => item.state && item.state.toLowerCase() === 'merged').length;
-    const closedCount = items.filter(item => item.state && item.state.toLowerCase() === 'closed').length;
-    total = `| Total: ${items.length}`;
-    statusBreakdown = `| Open: ${openCount}, Merged: ${mergedCount}, Closed: ${closedCount}`;
-  } else if (result.total) {
-    total = `| Total: ${result.total}`;
-  }
-  let header = `===== Project: ${projectName} | Type: ${type} ${dateRange} ${total} ${statusBreakdown} =====\n`;
-  // Example: format merge requests, commits, etc.
-  if (type === 'Merge Requests' && Array.isArray(result.items)) {
-    const items = result.items;
-    const merged = items.filter(item => item.state && item.state.toLowerCase() === 'merged');
-    const opened = items.filter(item => item.state && item.state.toLowerCase() === 'opened');
-    const closed = items.filter(item => item.state && item.state.toLowerCase() === 'closed');
-
-    function formatSection(sectionItems, sectionTitle) {
-      if (sectionItems.length === 0) return '';
-      return [
-        `🔄 ***************** ${sectionTitle} *****************`,
-        sectionItems.map(item => {
-          const reviewers = Array.isArray(item.reviewers)
-            ? item.reviewers.map(r => r.name).filter(Boolean).join(', ')
-            : (item.reviewers || '');
-          const mergedBy = item.merged_by && item.merged_by.name ? item.merged_by.name : '';
-          return [
-            `🔎 MR Title: ${item.title || ''}`,
-            item.web_url ? `🔗 MR Link: ${item.web_url}` : '',
-            item.author && item.author.name ? `✍️ Author: ${item.author.name}` : '',
-            reviewers ? `👥 Reviewers: ${reviewers}` : '',
-            mergedBy ? `👥 Merged by: ${mergedBy}` : '',
-            item.created_at ? `� Created At: ${formatEST(item.created_at)}` : '',
-            item.merged_at ? `📅 Merged At: ${formatEST(item.merged_at)}` : '',
-            item.source_branch && item.target_branch ? `🔀 ${item.source_branch} → ${item.target_branch}` : '',
-            '------------------------------------------------------------',
-          ].filter(Boolean).join('\n');
-        }).join('\n')
-      ].join('\n');
-    }
-
-    const mergedSection = formatSection(merged, 'Merged Merge Requests:');
-    const openedSection = formatSection(opened, 'Opened Merge Requests:');
-    const closedSection = formatSection(closed, 'Closed Merge Requests:');
-
-    return [
-      `**${header.trim()}**`,
-      mergedSection,
-      openedSection,
-      closedSection
-    ].filter(Boolean).join('\n\n');
-  }
-
-  if (type === 'Branches' && Array.isArray(result.items)) {
-    return (
-      header +
-      result.items.map(item => {
-        return [
-            '\n',
-          `Branch Name: ${item.name || ''}`,
-          item.web_url ? `web url: ${item.web_url}` : '',
-          item.author_name ? `Author: ${item.author_name}` : '',
-          '--------------------------------------------------------------------------------',
-        ].filter(Boolean).join('\n');
-      }).join('\n')
-    );
-  }
-
-  if (type === 'Commits' && Array.isArray(result.items)) {
-    return (
-      header +
-      result.items.map(item => {
-        return [
-          `🔎 Commit Title: ${item.title || item.message || ''}`,
-          item.web_url ? `🔗 Commit Link: ${item.web_url}` : '',
-          item.author_name ? `✍️ Author: ${item.author_name}` : '',
-          item.authored_date ? `📅 Authored At: ${item.authored_date}` : '',
-          item.committed_date ? `📅 Committed At: ${item.committed_date}` : '',
-          item.id ? `🔁 Commit ID: ${item.id.substring(0, 8)}` : '',
-          item.message ? `� Message: ${item.message}` : '',
-          '------------------------------------------------------------',
-        ].filter(Boolean).join('\n');
-      }).join('\n')
-    );
-  }
- // fallback
-  return header + JSON.stringify(result, null, 2);
 }

@@ -1,18 +1,28 @@
+/**
+ * App - Root component
+ * Updated to use ThemeProvider with dark mode support
+ */
 import React from 'react';
+import { Box } from '@mui/material';
 import TabsLayout from './TabsLayout';
-import { CssBaseline, Container, Typography } from '@mui/material';
+import ThemeProvider from './components/ThemeProvider';
 
 function App() {
   return (
-    <>
-      <CssBaseline />
-      <Container maxWidth="md" sx={{ pt: 4 }}>
-        <Typography variant="h4" align="center" gutterBottom>
-          GitLab Project Manager UI
-        </Typography>
+    <ThemeProvider>
+      <Box
+        sx={{
+          minHeight: '100vh',
+          background: (theme) => 
+            theme.palette.mode === 'dark'
+              ? 'linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%)'
+              : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          backgroundAttachment: 'fixed',
+        }}
+      >
         <TabsLayout />
-      </Container>
-    </>
+      </Box>
+    </ThemeProvider>
   );
 }
 
