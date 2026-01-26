@@ -1,96 +1,335 @@
-
-
-from fastapi import FastAPI, Query
+"""
+FastAPI application entry point.
+Refactored to use service layer and improved error handling.
+"""
+from fastapi import FastAPI, Query, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from typing import Optional
-from models.merge_request import fetch_merge_requests_from_gitlab
-from models.commit import fetch_commits_from_gitlab
-from models.branch import fetch_branches_from_gitlab
-from models.pipeline import fetch_pipelines_from_gitlab
-from models.user import fetch_project_users_from_gitlab
-from models.project import fetch_project_from_gitlab
 import traceback
 import logging
+from datetime import datetime
 
+try:
+    # Try absolute imports first (when running as module)
+    from backend.config import get_settings
+    from backend.services.gitlab_service import GitLabService
+    from backend.schemas.requests import DateRangeRequest, ProjectRequest
+    from backend.utils.cache import get_cache
+except ImportError:
+    # Fall back to relative imports (when running from backend directory)
+    from config import get_settings
+    from services.gitlab_service import GitLabService
+    from schemas.requests import DateRangeRequest, ProjectRequest
+    from utils.cache import get_cache
 
-app = FastAPI()
+# Configure logging
+logging.basicConfig(
+    level=get_settings().LOG_LEVEL,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-# Allow CORS for local React frontend
+# Initialize app
+app = FastAPI(
+    title="GitLab Project Manager API",
+    description="API for retrieving GitLab project information, merge requests, commits, and more",
+    version="2.0.0"
+)
+
+# Get settings
+settings = get_settings()
+
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Initialize service
+gitlab_service = GitLabService()
 
 
-@app.get("/merge-requests")
-def get_merge_requests(project_id: int, start_date: str, end_date: str):
-    project = {"id": project_id}
+# Exception handlers
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    """Global exception handler for unhandled errors."""
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "error": "Internal server error",
+            "message": str(exc) if settings.LOG_LEVEL == "DEBUG" else "An unexpected error occurred",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    )
+
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "cache_enabled": settings.CACHE_ENABLED
+    }
+
+
+# Cache management endpoints
+@app.post("/cache/clear")
+async def clear_cache():
+    """Clear the application cache."""
     try:
-        mrs = fetch_merge_requests_from_gitlab(project, start_date, end_date)
-        return {"items": [mr.__dict__ for mr in mrs]}
+        cache = get_cache()
+        cache.clear()
+        return {"message": "Cache cleared successfully", "timestamp": datetime.utcnow().isoformat()}
     except Exception as e:
-        logging.error(traceback.format_exc())
-        return {"error": str(e), "trace": traceback.format_exc()}
+        logger.error(f"Error clearing cache: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear cache")
 
+
+@app.get("/cache/stats")
+async def cache_stats():
+    """Get cache statistics."""
+    cache = get_cache()
+    return {
+        "cache_enabled": settings.CACHE_ENABLED,
+        "cache_size": len(cache.cache),
+        "cache_ttl": settings.CACHE_TTL
+    }
+
+
+# API Endpoints
+@app.get("/merge-requests")
+async def get_merge_requests(
+    project_id: int = Query(..., description="GitLab project ID", gt=0),
+    start_date: str = Query(..., description="Start date in MM/DD/YYYY format"),
+    end_date: str = Query(..., description="End date in MM/DD/YYYY format")
+):
+    """
+    Get merge requests for a project within a date range.
+    
+    - **project_id**: GitLab project ID
+    - **start_date**: Start date in MM/DD/YYYY format
+    - **end_date**: End date in MM/DD/YYYY format
+    """
+    try:
+        # Validate request
+        request_data = DateRangeRequest(
+            project_id=project_id,
+            start_date=start_date,
+            end_date=end_date
+        )
+        
+        # Fetch data
+        mrs = gitlab_service.get_merge_requests(
+            request_data.project_id,
+            request_data.start_date,
+            request_data.end_date
+        )
+        
+        return {
+            "items": [mr.__dict__ for mr in mrs],
+            "count": len(mrs),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error fetching merge requests: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch merge requests: {str(e)}"
+        )
 
 
 @app.get("/commits")
-def get_commits(project_id: int, start_date: str, end_date: str):
-    project = {"id": project_id}
+async def get_commits(
+    project_id: int = Query(..., description="GitLab project ID", gt=0),
+    start_date: str = Query(..., description="Start date in MM/DD/YYYY format"),
+    end_date: str = Query(..., description="End date in MM/DD/YYYY format")
+):
+    """
+    Get commits for a project within a date range.
+    
+    - **project_id**: GitLab project ID
+    - **start_date**: Start date in MM/DD/YYYY format
+    - **end_date**: End date in MM/DD/YYYY format
+    """
     try:
-        commits = fetch_commits_from_gitlab(project, start_date, end_date)
-        return {"items": [c.__dict__ for c in commits]}
+        # Validate request
+        request_data = DateRangeRequest(
+            project_id=project_id,
+            start_date=start_date,
+            end_date=end_date
+        )
+        
+        # Fetch data
+        commits = gitlab_service.get_commits(
+            request_data.project_id,
+            request_data.start_date,
+            request_data.end_date
+        )
+        
+        return {
+            "items": [c.__dict__ for c in commits],
+            "count": len(commits),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logging.error(traceback.format_exc())
-        return {"error": str(e), "trace": traceback.format_exc()}
-
+        logger.error(f"Error fetching commits: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch commits: {str(e)}"
+        )
 
 
 @app.get("/branches")
-def get_branches(project_id: int):
-    project = {"id": project_id}
+async def get_branches(
+    project_id: int = Query(..., description="GitLab project ID", gt=0)
+):
+    """
+    Get all branches for a project.
+    
+    - **project_id**: GitLab project ID
+    """
     try:
-        branches = fetch_branches_from_gitlab(project)
-        return {"items": [b.__dict__ for b in branches]}
+        # Validate request
+        request_data = ProjectRequest(project_id=project_id)
+        
+        # Fetch data
+        branches = gitlab_service.get_branches(request_data.project_id)
+        
+        return {
+            "items": [b.__dict__ for b in branches],
+            "count": len(branches),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logging.error(traceback.format_exc())
-        return {"error": str(e), "trace": traceback.format_exc()}
-
+        logger.error(f"Error fetching branches: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch branches: {str(e)}"
+        )
 
 
 @app.get("/pipelines")
-def get_pipelines(project_id: int):
-    project = {"id": project_id}
+async def get_pipelines(
+    project_id: int = Query(..., description="GitLab project ID", gt=0)
+):
+    """
+    Get all pipelines for a project.
+    
+    - **project_id**: GitLab project ID
+    """
     try:
-        pipelines = fetch_pipelines_from_gitlab(project)
-        return {"items": [p.__dict__ for p in pipelines]}
+        # Validate request
+        request_data = ProjectRequest(project_id=project_id)
+        
+        # Fetch data
+        pipelines = gitlab_service.get_pipelines(request_data.project_id)
+        
+        return {
+            "items": [p.__dict__ for p in pipelines],
+            "count": len(pipelines),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logging.error(traceback.format_exc())
-        return {"error": str(e), "trace": traceback.format_exc()}
-
+        logger.error(f"Error fetching pipelines: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch pipelines: {str(e)}"
+        )
 
 
 @app.get("/users")
-def get_users(project_id: int):
-    project = {"id": project_id}
+async def get_users(
+    project_id: int = Query(..., description="GitLab project ID", gt=0)
+):
+    """
+    Get all project members.
+    
+    - **project_id**: GitLab project ID
+    """
     try:
-        users = fetch_project_users_from_gitlab(project)
-        return {"items": [u.__dict__ for u in users]}
+        # Validate request
+        request_data = ProjectRequest(project_id=project_id)
+        
+        # Fetch data
+        users = gitlab_service.get_users(request_data.project_id)
+        
+        return {
+            "items": [u.__dict__ for u in users],
+            "count": len(users),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logging.error(traceback.format_exc())
-        return {"error": str(e), "trace": traceback.format_exc()}
-
+        logger.error(f"Error fetching users: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch users: {str(e)}"
+        )
 
 
 @app.get("/project")
-def get_project(project_id: int):
+async def get_project(
+    project_id: int = Query(..., description="GitLab project ID", gt=0)
+):
+    """
+    Get project details.
+    
+    - **project_id**: GitLab project ID
+    """
     try:
-        project = fetch_project_from_gitlab(project_id)
-        return project.__dict__
+        # Validate request
+        request_data = ProjectRequest(project_id=project_id)
+        
+        # Fetch data
+        project = gitlab_service.get_project(request_data.project_id)
+        
+        return {
+            **project.__dict__,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        logging.error(traceback.format_exc())
-        return {"error": str(e), "trace": traceback.format_exc()}
+        logger.error(f"Error fetching project: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch project: {str(e)}"
+        )
+
+
+# Startup event
+@app.on_event("startup")
+async def startup_event():
+    """Initialize application on startup."""
+    logger.info("Starting GitLab Project Manager API")
+    logger.info(f"Cache enabled: {settings.CACHE_ENABLED}")
+    logger.info(f"CORS origins: {settings.CORS_ORIGINS}")
+    # Validate settings
+    try:
+        settings.validate()
+        logger.info("Configuration validated successfully")
+    except ValueError as e:
+        logger.error(f"Configuration error: {e}")
+        raise
