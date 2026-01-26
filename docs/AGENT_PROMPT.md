@@ -90,11 +90,11 @@ Formatting Rules (JS mirrors backend text spec):
 ## 5. Environment Variable Instructions
 PowerShell (current session):
 ```
-$env:GITLAB_TOKEN="glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"
+$env:GITLAB_TOKEN="your-gitlab-token-here"
 ```
 Persistent (requires new terminal):
 ```
-setx GITLAB_TOKEN "glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"
+setx GITLAB_TOKEN "your-gitlab-token-here"
 ```
 Backend MUST refuse to start (clear error) if token missing.
 

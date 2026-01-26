@@ -2,13 +2,15 @@
 FastAPI application entry point.
 Refactored to use service layer and improved error handling.
 """
-from fastapi import FastAPI, Query, HTTPException, status
+from fastapi import FastAPI, Query, HTTPException, status, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from typing import Optional
 import traceback
 import logging
 from datetime import datetime
+from pathlib import Path
+import re
 
 try:
     # Try absolute imports first (when running as module)
@@ -317,6 +319,86 @@ async def get_project(
             status_code=500,
             detail=f"Failed to fetch project: {str(e)}"
         )
+
+
+# Token management endpoints
+@app.get("/config/token")
+async def get_token_status():
+    """Get token status (without exposing the actual token)."""
+    try:
+        token = settings.GITLAB_TOKEN
+        return {
+            "has_token": bool(token),
+            "token_length": len(token) if token else 0,
+            "token_preview": f"{token[:4]}...{token[-4:]}" if token and len(token) > 8 else "Not set"
+        }
+    except Exception as e:
+        logger.error(f"Error getting token status: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get token status")
+
+
+@app.post("/config/token")
+async def update_token(token: str = Body(..., embed=True)):
+    """Update GitLab token in .env file."""
+    try:
+        if not token or len(token.strip()) < 10:
+            raise HTTPException(status_code=400, detail="Token is required and must be at least 10 characters")
+        
+        token = token.strip()
+        
+        # Find .env file
+        env_path = Path(__file__).parent.parent / '.env'
+        
+        # Read existing .env file or create new one
+        env_content = ""
+        if env_path.exists():
+            env_content = env_path.read_text(encoding='utf-8')
+        else:
+            # Create from example if it exists
+            example_path = Path(__file__).parent.parent / '.env.example'
+            if example_path.exists():
+                env_content = example_path.read_text(encoding='utf-8')
+        
+        # Update or add GITLAB_TOKEN
+        lines = env_content.split('\n')
+        token_updated = False
+        new_lines = []
+        
+        for line in lines:
+            if line.strip().startswith('GITLAB_TOKEN='):
+                new_lines.append(f'GITLAB_TOKEN={token}')
+                token_updated = True
+            else:
+                new_lines.append(line)
+        
+        if not token_updated:
+            # Add token if it wasn't found
+            if new_lines and new_lines[-1].strip():
+                new_lines.append('')
+            new_lines.append(f'GITLAB_TOKEN={token}')
+        
+        # Write back to .env file
+        env_path.write_text('\n'.join(new_lines), encoding='utf-8')
+        
+        # Update settings in memory
+        os.environ['GITLAB_TOKEN'] = token
+        settings.GITLAB_TOKEN = token
+        
+        # Clear cache to force reload with new token
+        cache = get_cache()
+        cache.clear()
+        
+        logger.info("GitLab token updated successfully")
+        
+        return {
+            "message": "Token updated successfully",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating token: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to update token: {str(e)}")
 
 
 # Startup event

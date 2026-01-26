@@ -15,11 +15,11 @@ This UI provides a modern, tabbed interface for GitLab analytics and reporting. 
   venv\Scripts\activate  # On Windows
   pip install -r requirements.txt
   # Set your GitLab token for the current session (PowerShell):
-  $env:GITLAB_TOKEN="glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"
+  $env:GITLAB_TOKEN="your-gitlab-token-here"
   uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
   # To set the token permanently (for all future sessions), run this in PowerShell:
-  # setx GITLAB_TOKEN "glpat-FtgdSF6sUqPQqbQGMWlEBW86MQp1OmNxNTY3Cw.01.121pugvpk"
+  # setx GITLAB_TOKEN "your-gitlab-token-here"
   # Restart your terminal before running the backend
 
   # Ensure that the GITLAB_TOKEN is set before running the backend

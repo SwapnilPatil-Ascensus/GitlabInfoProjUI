@@ -3,8 +3,23 @@ Configuration management for the application.
 Centralizes all configuration settings and environment variables.
 """
 import os
+from pathlib import Path
 from typing import List, Optional
 from functools import lru_cache
+
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    # Load .env file from project root (parent of backend directory)
+    env_path = Path(__file__).parent.parent / '.env'
+    if env_path.exists():
+        load_dotenv(dotenv_path=env_path)
+    else:
+        # Try loading from current directory as fallback
+        load_dotenv()
+except ImportError:
+    # python-dotenv not installed, skip loading .env file
+    pass
 
 
 class Settings:
