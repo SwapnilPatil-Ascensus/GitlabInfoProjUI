@@ -1,0 +1,38 @@
+# Enforces that the LICENSE-required copyright attribution is not removed or altered.
+# The footer must always show "© [year] Swapnil Patil. All rights reserved."
+# See LICENSE in the project root.
+
+name: Check attribution
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  attribution:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require copyright owner in attribution
+        run: |
+          if ! grep -q "Swapnil Patil" ui/src/utils/attribution.js; then
+            echo "::error::ui/src/utils/attribution.js must contain 'Swapnil Patil'. Do not remove or alter the LICENSE-required attribution."
+            exit 1
+          fi
+
+      - name: Require copyright suffix in attribution
+        run: |
+          if ! grep -q "All rights reserved" ui/src/utils/attribution.js; then
+            echo "::error::ui/src/utils/attribution.js must contain 'All rights reserved'. Do not remove or alter the LICENSE-required attribution."
+            exit 1
+          fi
+
+      - name: Require AppFooter to use attribution module
+        run: |
+          if ! grep -q "from '../utils/attribution'" ui/src/components/AppFooter.js && ! grep -q 'from "../utils/attribution"' ui/src/components/AppFooter.js; then
+            echo "::error::AppFooter must import COPYRIGHT_OWNER and COPYRIGHT_SUFFIX from utils/attribution. Do not remove the LICENSE-required attribution."
+            exit 1
+          fi

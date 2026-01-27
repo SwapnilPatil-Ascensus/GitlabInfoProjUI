@@ -539,7 +539,8 @@ npm test
 
 ## 📄 License
 
-[Add your license information here]
+This project is licensed under the [MIT License](LICENSE).  
+**Attribution requirement:** The copyright notice in the app footer (“© [year] Swapnil Patil. All rights reserved.”) must be retained in all forks and derivative works. See [LICENSE](LICENSE) for details.
 
 ---
 

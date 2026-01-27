@@ -1,8 +1,10 @@
 /**
- * AppFooter component - Footer with links and copyright
+ * AppFooter component - Footer with links and copyright.
+ * Copyright notice is required by LICENSE — do not remove or alter. See src/utils/attribution.js
  */
 import { Box, Typography, Link, Container } from '@mui/material';
 import { styled } from '@mui/material/styles';
+import { COPYRIGHT_OWNER, COPYRIGHT_SUFFIX } from '../utils/attribution';
 
 const StyledFooter = styled(Box)(({ theme }) => ({
   background: theme.palette.mode === 'dark'
@@ -45,7 +47,7 @@ export default function AppFooter({ onAboutClick, onContactClick }) {
             </Link>
           </Box>
           <Typography variant="body2" color="text.secondary">
-            © {currentYear} Swapnil Patil. All rights reserved.
+            © {currentYear} {COPYRIGHT_OWNER}. {COPYRIGHT_SUFFIX}
           </Typography>
         </Box>
       </Container>
