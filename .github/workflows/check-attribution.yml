@@ -15,24 +15,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Require copyright owner in attribution
         run: |
-          if ! grep -q "Swapnil Patil" ui/src/utils/attribution.js; then
-            echo "::error::ui/src/utils/attribution.js must contain 'Swapnil Patil'. Do not remove or alter the LICENSE-required attribution."
+          ATTR_FILE="ui/src/utils/attribution.js"
+          [ -f "$ATTR_FILE" ] || ATTR_FILE="src/utils/attribution.js"
+          if [ ! -f "$ATTR_FILE" ]; then
+            echo "::error::Attribution file not found. Expected ui/src/utils/attribution.js or src/utils/attribution.js."
+            exit 1
+          fi
+          if ! grep -q "Swapnil Patil" "$ATTR_FILE"; then
+            echo "::error::$ATTR_FILE must contain 'Swapnil Patil'. Do not remove or alter the LICENSE-required attribution."
             exit 1
           fi
 
       - name: Require copyright suffix in attribution
         run: |
-          if ! grep -q "All rights reserved" ui/src/utils/attribution.js; then
-            echo "::error::ui/src/utils/attribution.js must contain 'All rights reserved'. Do not remove or alter the LICENSE-required attribution."
+          ATTR_FILE="ui/src/utils/attribution.js"
+          [ -f "$ATTR_FILE" ] || ATTR_FILE="src/utils/attribution.js"
+          if ! grep -q "All rights reserved" "$ATTR_FILE"; then
+            echo "::error::$ATTR_FILE must contain 'All rights reserved'. Do not remove or alter the LICENSE-required attribution."
             exit 1
           fi
 
       - name: Require AppFooter to use attribution module
         run: |
-          if ! grep -q "from '../utils/attribution'" ui/src/components/AppFooter.js && ! grep -q 'from "../utils/attribution"' ui/src/components/AppFooter.js; then
+          FOOTER_FILE="ui/src/components/AppFooter.js"
+          [ -f "$FOOTER_FILE" ] || FOOTER_FILE="src/components/AppFooter.js"
+          if [ ! -f "$FOOTER_FILE" ]; then
+            echo "::error::AppFooter not found. Expected ui/src/components/AppFooter.js or src/components/AppFooter.js."
+            exit 1
+          fi
+          if ! grep -q "from '../utils/attribution'" "$FOOTER_FILE" && ! grep -q 'from "../utils/attribution"' "$FOOTER_FILE"; then
             echo "::error::AppFooter must import COPYRIGHT_OWNER and COPYRIGHT_SUFFIX from utils/attribution. Do not remove the LICENSE-required attribution."
             exit 1
           fi
