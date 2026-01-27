@@ -1,9 +1,8 @@
 /**
  * AppHeader component - Main application header with navigation
  */
-import { AppBar, Toolbar, Typography, Box, Button, IconButton } from '@mui/material';
+import { AppBar, Toolbar, Typography, Box, Button } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import GitHubIcon from '@mui/icons-material/GitHub';
 import DarkModeToggle from './DarkModeToggle';
 
 const StyledAppBar = styled(AppBar)(({ theme }) => ({
@@ -40,7 +39,7 @@ export default function AppHeader({ onAboutClick, onContactClick, onTokenClick, 
             transition: 'opacity 0.2s ease-in-out',
           }}
         >
-          <GitHubIcon sx={{ fontSize: 32 }} />
+          <img src="/gitlab-logo-white.png" alt="GitLab" width={32} height={32} style={{ display: 'block' }} />
           <Typography variant="h5" component="div" sx={{ fontWeight: 600 }}>
             GitLab Project Manager
           </Typography>
