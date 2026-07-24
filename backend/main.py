@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from typing import Optional
 import traceback
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 import re
@@ -18,12 +19,14 @@ try:
     from backend.services.gitlab_service import GitLabService
     from backend.schemas.requests import DateRangeRequest, ProjectRequest
     from backend.utils.cache import get_cache
+    from backend.utils.gitlab_client import get_gitlab_client, reset_gitlab_client
 except ImportError:
     # Fall back to relative imports (when running from backend directory)
     from config import get_settings
     from services.gitlab_service import GitLabService
     from schemas.requests import DateRangeRequest, ProjectRequest
     from utils.cache import get_cache
+    from utils.gitlab_client import get_gitlab_client, reset_gitlab_client
 
 # Configure logging
 logging.basicConfig(
@@ -383,6 +386,11 @@ async def update_token(token: str = Body(..., embed=True)):
         # Update settings in memory
         os.environ['GITLAB_TOKEN'] = token
         settings.GITLAB_TOKEN = token
+
+        # Recreate shared GitLab client so new requests use updated headers.
+        reset_gitlab_client()
+        gitlab_service.client = get_gitlab_client()
+        gitlab_service.base_url = gitlab_service.client.get_base_url()
         
         # Clear cache to force reload with new token
         cache = get_cache()

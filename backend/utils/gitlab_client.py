@@ -167,3 +167,9 @@ def get_gitlab_client() -> GitLabClient:
     if _client is None:
         _client = GitLabClient()
     return _client
+
+
+def reset_gitlab_client() -> None:
+    """Reset the singleton client so it is recreated with latest settings."""
+    global _client
+    _client = None
