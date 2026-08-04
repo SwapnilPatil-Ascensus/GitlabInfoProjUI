@@ -17,14 +17,14 @@ try:
     # Try absolute imports first (when running as module)
     from backend.config import get_settings
     from backend.services.gitlab_service import GitLabService
-    from backend.schemas.requests import DateRangeRequest, ProjectRequest
+    from backend.schemas.requests import DateRangeRequest, ProjectRequest, TeamMergeReportRequest, UserWorkDashboardRequest
     from backend.utils.cache import get_cache
     from backend.utils.gitlab_client import get_gitlab_client, reset_gitlab_client
 except ImportError:
     # Fall back to relative imports (when running from backend directory)
     from config import get_settings
     from services.gitlab_service import GitLabService
-    from schemas.requests import DateRangeRequest, ProjectRequest
+    from schemas.requests import DateRangeRequest, ProjectRequest, TeamMergeReportRequest, UserWorkDashboardRequest
     from utils.cache import get_cache
     from utils.gitlab_client import get_gitlab_client, reset_gitlab_client
 
@@ -111,7 +111,7 @@ async def cache_stats():
 # API Endpoints
 @app.get("/merge-requests")
 async def get_merge_requests(
-    project_id: int = Query(..., description="GitLab project ID", gt=0),
+    project_id: str = Query(..., description="GitLab project ID or URL-encoded path"),
     start_date: str = Query(..., description="Start date in MM/DD/YYYY format"),
     end_date: str = Query(..., description="End date in MM/DD/YYYY format")
 ):
@@ -155,7 +155,7 @@ async def get_merge_requests(
 
 @app.get("/commits")
 async def get_commits(
-    project_id: int = Query(..., description="GitLab project ID", gt=0),
+    project_id: str = Query(..., description="GitLab project ID or URL-encoded path"),
     start_date: str = Query(..., description="Start date in MM/DD/YYYY format"),
     end_date: str = Query(..., description="End date in MM/DD/YYYY format")
 ):
@@ -199,7 +199,7 @@ async def get_commits(
 
 @app.get("/branches")
 async def get_branches(
-    project_id: int = Query(..., description="GitLab project ID", gt=0)
+    project_id: str = Query(..., description="GitLab project ID or URL-encoded path")
 ):
     """
     Get all branches for a project.
@@ -231,7 +231,7 @@ async def get_branches(
 
 @app.get("/pipelines")
 async def get_pipelines(
-    project_id: int = Query(..., description="GitLab project ID", gt=0)
+    project_id: str = Query(..., description="GitLab project ID or URL-encoded path")
 ):
     """
     Get all pipelines for a project.
@@ -263,7 +263,7 @@ async def get_pipelines(
 
 @app.get("/users")
 async def get_users(
-    project_id: int = Query(..., description="GitLab project ID", gt=0)
+    project_id: str = Query(..., description="GitLab project ID or URL-encoded path")
 ):
     """
     Get all project members.
@@ -295,7 +295,7 @@ async def get_users(
 
 @app.get("/project")
 async def get_project(
-    project_id: int = Query(..., description="GitLab project ID", gt=0)
+    project_id: str = Query(..., description="GitLab project ID or URL-encoded path")
 ):
     """
     Get project details.
@@ -321,6 +321,121 @@ async def get_project(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to fetch project: {str(e)}"
+        )
+
+
+@app.get("/team-merge-report")
+async def get_team_merge_report(
+    project_id: str = Query(..., description="GitLab project ID or URL-encoded path"),
+    start_date: str = Query(..., description="Start date in MM/DD/YYYY format"),
+    end_date: str = Query(..., description="End date in MM/DD/YYYY format"),
+    team_members: Optional[str] = Query(None, description="Comma-separated author names/usernames"),
+    target_branch: Optional[str] = Query(None, description="Optional target branch"),
+    merged_by: Optional[str] = Query(None, description="Optional merged-by user"),
+):
+    """
+    Get merged merge requests for team activity reporting.
+
+    - **project_id**: GitLab project ID
+    - **start_date**: Start date in MM/DD/YYYY format
+    - **end_date**: End date in MM/DD/YYYY format
+    - **team_members**: Optional comma-separated author names/usernames
+    - **target_branch**: Optional target branch filter
+    - **merged_by**: Optional merged-by user filter
+    """
+    try:
+        request_data = TeamMergeReportRequest(
+            project_id=project_id,
+            start_date=start_date,
+            end_date=end_date,
+            team_members=team_members,
+            target_branch=target_branch,
+            merged_by=merged_by,
+        )
+
+        report_items = gitlab_service.get_team_merge_report(
+            request_data.project_id,
+            request_data.start_date,
+            request_data.end_date,
+            request_data.team_members,
+            request_data.target_branch,
+            request_data.merged_by,
+        )
+
+        return {
+            "items": [item.__dict__ for item in report_items],
+            "count": len(report_items),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error fetching team merge report: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch team merge report: {str(e)}"
+        )
+
+
+@app.get("/team-members")
+async def get_team_members(
+    project_id: str = Query(..., description="GitLab project ID or qa-automation parent key"),
+    q: Optional[str] = Query(None, description="Optional prefix/search text"),
+    limit: int = Query(50, ge=1, le=200, description="Max members to return"),
+):
+    """Get cached team members for autocomplete and multi-select filtering."""
+    try:
+        request_data = ProjectRequest(project_id=project_id)
+        members = gitlab_service.get_team_members(request_data.project_id, q, limit)
+        return {
+            "items": members,
+            "count": len(members),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error fetching team members: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch team members: {str(e)}"
+        )
+
+
+@app.get("/user-work-dashboard")
+async def get_user_work_dashboard(
+    project_id: str = Query(..., description="GitLab project ID or qa-automation parent key"),
+    start_date: str = Query(..., description="Start date in MM/DD/YYYY format"),
+    end_date: str = Query(..., description="End date in MM/DD/YYYY format"),
+    users: str = Query(..., description="Comma-separated GitLab usernames/names"),
+):
+    """Get leadership dashboard data for selected users across selected scope."""
+    try:
+        request_data = UserWorkDashboardRequest(
+            project_id=project_id,
+            start_date=start_date,
+            end_date=end_date,
+            users=users,
+        )
+
+        dashboard_data = gitlab_service.get_user_work_dashboard(
+            project_id=request_data.project_id,
+            start_date=request_data.start_date,
+            end_date=request_data.end_date,
+            users=request_data.users,
+        )
+        dashboard_data["timestamp"] = datetime.utcnow().isoformat()
+        return dashboard_data
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error fetching user work dashboard: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch user work dashboard: {str(e)}"
         )
 
 
@@ -420,6 +535,10 @@ async def startup_event():
     try:
         settings.validate()
         logger.info("Configuration validated successfully")
+        gitlab_service.refresh_team_members_cache()
+        logger.info("Team members cache warmed successfully")
     except ValueError as e:
         logger.error(f"Configuration error: {e}")
         raise
+    except Exception as e:
+        logger.warning(f"Team members cache warmup failed: {e}")

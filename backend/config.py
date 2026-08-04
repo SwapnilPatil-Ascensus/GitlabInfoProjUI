@@ -13,10 +13,10 @@ try:
     # Load .env file from project root (parent of backend directory)
     env_path = Path(__file__).parent.parent / '.env'
     if env_path.exists():
-        load_dotenv(dotenv_path=env_path)
+        load_dotenv(dotenv_path=env_path, override=True)
     else:
         # Try loading from current directory as fallback
-        load_dotenv()
+        load_dotenv(override=True)
 except ImportError:
     # python-dotenv not installed, skip loading .env file
     pass
