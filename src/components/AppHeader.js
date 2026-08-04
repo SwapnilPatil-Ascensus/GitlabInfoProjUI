@@ -21,7 +21,15 @@ const StyledButton = styled(Button)(({ theme }) => ({
   },
 }));
 
-export default function AppHeader({ onAboutClick, onContactClick, onTokenClick, onHomeClick }) {
+export default function AppHeader({
+  onAboutClick,
+  onContactClick,
+  onTokenClick,
+  onHomeClick,
+  onDashboardClick,
+  onReportingClick,
+  currentView,
+}) {
   return (
     <StyledAppBar position="static">
       <Toolbar>
@@ -46,6 +54,22 @@ export default function AppHeader({ onAboutClick, onContactClick, onTokenClick, 
         </Box>
         
         <Box display="flex" alignItems="center" gap={1}>
+          <StyledButton
+            onClick={onDashboardClick}
+            sx={{
+              bgcolor: currentView === 'leadership' ? 'rgba(255,255,255,0.22)' : 'transparent',
+            }}
+          >
+            Dashboard
+          </StyledButton>
+          <StyledButton
+            onClick={onReportingClick}
+            sx={{
+              bgcolor: currentView === 'reporting' ? 'rgba(255,255,255,0.22)' : 'transparent',
+            }}
+          >
+            Reporting
+          </StyledButton>
           <StyledButton onClick={onTokenClick}>
             Manage Token
           </StyledButton>

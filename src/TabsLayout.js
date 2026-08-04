@@ -2,11 +2,13 @@
  * TabsLayout - Main component with tabbed interface
  * Refactored with premium UI, search, filter, export, and dark mode support
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { 
+  Autocomplete,
   Tabs, Tab, Box, Button, TextField, Typography, MenuItem, Select, 
   InputLabel, FormControl, Card, CardContent, CardHeader, Divider, 
-  IconButton, Tooltip, Chip, Stack, Fade
+  IconButton, Tooltip, Chip, Stack, Fade, ToggleButtonGroup, ToggleButton,
+  CircularProgress, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
@@ -20,10 +22,12 @@ import {
   fetchBranches,
   fetchPipelines,
   fetchUsers,
-  fetchProject
+  fetchProject,
+  fetchTeamMergeReport,
+  fetchTeamMembers
 } from './api';
 import { PROJECTS, TAB_CONFIG } from './utils/constants';
-import { formatResult, getDatePreset } from './utils/formatters';
+import { formatResult } from './utils/formatters';
 import { 
   getMergeRequestHeaders, getCommitHeaders, getBranchHeaders, 
   getPipelineHeaders, getUserHeaders 
@@ -45,6 +49,7 @@ const apiMap = {
   pipelines: fetchPipelines,
   users: fetchUsers,
   project: fetchProject,
+  teamMergeReport: fetchTeamMergeReport,
 };
 
 const StyledTabsContainer = styled(Box)(({ theme }) => ({
@@ -86,10 +91,32 @@ export default function TabsLayout() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selectedPreset, setSelectedPreset] = useState(null);
+  const [branchOptions, setBranchOptions] = useState([]);
+  const [branchesLoading, setBranchesLoading] = useState(false);
+  const [teamMemberOptions, setTeamMemberOptions] = useState([]);
+  const [teamMembersLoading, setTeamMembersLoading] = useState(false);
+  const [teamMemberInput, setTeamMemberInput] = useState('');
+  const [selectedTeamMembers, setSelectedTeamMembers] = useState([]);
+  // MR state filter: which states to include (open, merged, closed)
+  const [mrStateFilter, setMrStateFilter] = useState({ open: true, merged: true, closed: true });
 
   const currentTab = TAB_CONFIG[tab];
-  // Use filtered result if available, otherwise use original result
-  const displayResult = filteredResult || result;
+
+  // For Merge Requests: filter items by selected states (opened/merged/closed)
+  const stateFilteredResult = useMemo(() => {
+    if (currentTab.key !== 'mergeRequests' || !result?.items) return result;
+    const allowed = [];
+    if (mrStateFilter.open) allowed.push('opened');
+    if (mrStateFilter.merged) allowed.push('merged');
+    if (mrStateFilter.closed) allowed.push('closed');
+    if (allowed.length === 0) return { ...result, items: [] };
+    const items = result.items.filter(item => item.state && allowed.includes(item.state.toLowerCase()));
+    return { ...result, items };
+  }, [currentTab.key, result, mrStateFilter]);
+
+  // Base result: state-filtered for MR, else raw result. Display = search-filtered or base.
+  const baseResult = currentTab.key === 'mergeRequests' ? stateFilteredResult : result;
+  const displayResult = filteredResult || baseResult;
 
   // Get export headers based on current tab
   const getExportHeaders = () => {
@@ -104,6 +131,8 @@ export default function TabsLayout() {
         return getPipelineHeaders();
       case 'users':
         return getUserHeaders();
+      case 'teamMergeReport':
+        return getMergeRequestHeaders();
       default:
         return [];
     }
@@ -122,6 +151,8 @@ export default function TabsLayout() {
         return ['ref', 'status'];
       case 'users':
         return ['name', 'username'];
+      case 'teamMergeReport':
+        return ['title', 'author.name', 'author.username', 'merged_by.name', 'source_branch', 'target_branch'];
       default:
         return [];
     }
@@ -140,15 +171,98 @@ export default function TabsLayout() {
     setSelectedPreset(presetLabel);
   };
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadBranches = async () => {
+      if (
+        currentTab.key !== 'teamMergeReport' ||
+        !params.project_id ||
+        params.project_id === 'qa-automation-group'
+      ) {
+        setBranchOptions([]);
+        setBranchesLoading(false);
+        return;
+      }
+
+      setBranchesLoading(true);
+      try {
+        const { data } = await fetchBranches({ project_id: params.project_id });
+        if (cancelled) return;
+        const names = (data?.items || [])
+          .map((b) => b.name)
+          .filter(Boolean)
+          .sort((a, b) => a.localeCompare(b));
+        setBranchOptions(names);
+      } catch {
+        if (!cancelled) setBranchOptions([]);
+      } finally {
+        if (!cancelled) setBranchesLoading(false);
+      }
+    };
+
+    loadBranches();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentTab.key, params.project_id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer = null;
+
+    const loadTeamMembers = async () => {
+      if (currentTab.key !== 'teamMergeReport' || !params.project_id) {
+        setTeamMemberOptions([]);
+        setTeamMembersLoading(false);
+        return;
+      }
+
+      setTeamMembersLoading(true);
+      try {
+        const { data } = await fetchTeamMembers({
+          project_id: params.project_id,
+          q: teamMemberInput || undefined,
+          limit: 100,
+        });
+        if (!cancelled) {
+          setTeamMemberOptions(data?.items || []);
+        }
+      } catch {
+        if (!cancelled) setTeamMemberOptions([]);
+      } finally {
+        if (!cancelled) setTeamMembersLoading(false);
+      }
+    };
+
+    timer = setTimeout(loadTeamMembers, 250);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [currentTab.key, params.project_id, teamMemberInput]);
+
   const handleGenerate = async () => {
     setLoading(true);
     setError(null);
     setResult(null);
     setFilteredResult(null); // Clear filtered results when generating new data
     const tabKey = currentTab.key;
+    const requestParams = { ...params };
+
+    if (tabKey === 'teamMergeReport') {
+      requestParams.team_members = selectedTeamMembers
+        .map((member) => member.username || member.name)
+        .filter(Boolean)
+        .join(',');
+
+      if (!requestParams.team_members) {
+        delete requestParams.team_members;
+      }
+    }
     
     try {
-      const { data } = await apiMap[tabKey](params);
+      const { data } = await apiMap[tabKey](requestParams);
       setResult(data);
       // Clear filtered result so displayResult uses the new result
       setFilteredResult(null);
@@ -176,6 +290,12 @@ export default function TabsLayout() {
     setError(null);
     setParams({});
     setSelectedPreset(null);
+    setBranchOptions([]);
+    setBranchesLoading(false);
+    setTeamMemberOptions([]);
+    setTeamMemberInput('');
+    setSelectedTeamMembers([]);
+    setTeamMembersLoading(false);
   };
 
   const isFormValid = () => {
@@ -303,6 +423,86 @@ export default function TabsLayout() {
                     />
                   );
                 }
+                if (p === 'target_branch' && currentTab.key === 'teamMergeReport') {
+                  return (
+                    <FormControl key={p} size="small" sx={{ width: '100%' }}>
+                      <InputLabel id="target-branch-select-label">Target Branch (Optional)</InputLabel>
+                      <Select
+                        labelId="target-branch-select-label"
+                        id="target-branch-select"
+                        value={params[p] || ''}
+                        label="Target Branch (Optional)"
+                        onChange={e => handleParamChange(p, e.target.value)}
+                        disabled={!params.project_id || branchesLoading}
+                      >
+                        <MenuItem value="">All Branches</MenuItem>
+                        {branchOptions.map(branchName => (
+                          <MenuItem key={branchName} value={branchName}>{branchName}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  );
+                }
+                if (p === 'team_members') {
+                  return (
+                    <Autocomplete
+                      key={p}
+                      multiple
+                      options={teamMemberOptions}
+                      loading={teamMembersLoading}
+                      value={selectedTeamMembers}
+                      inputValue={teamMemberInput}
+                      onInputChange={(_, newInputValue) => setTeamMemberInput(newInputValue)}
+                      onChange={(_, newValue) => {
+                        setSelectedTeamMembers(newValue);
+                        handleParamChange(
+                          'team_members',
+                          newValue.map((member) => member.username || member.name).filter(Boolean)
+                        );
+                      }}
+                      isOptionEqualToValue={(option, value) => option.id === value.id}
+                      getOptionLabel={(option) => option?.name || option?.username || ''}
+                      noOptionsText={teamMemberInput ? 'No matching team members' : 'Start typing a name'}
+                      renderOption={(props, option) => (
+                        <Box component="li" {...props}>
+                          <Typography variant="body2">{option.name || option.username || ''}</Typography>
+                        </Box>
+                      )}
+                      renderInput={(inputParams) => (
+                        <TextField
+                          {...inputParams}
+                          label="Team Members (Optional)"
+                          placeholder="Type: venk"
+                          helperText="Type to search and select multiple team members"
+                          size="small"
+                          fullWidth
+                          InputProps={{
+                            ...inputParams.InputProps,
+                            endAdornment: (
+                              <>
+                                {teamMembersLoading ? <CircularProgress color="inherit" size={16} /> : null}
+                                {inputParams.InputProps.endAdornment}
+                              </>
+                            ),
+                          }}
+                        />
+                      )}
+                    />
+                  );
+                }
+                if (p === 'merged_by') {
+                  return (
+                    <TextField
+                      key={p}
+                      label="Merged By (Optional)"
+                      value={params[p] || ''}
+                      onChange={e => handleParamChange(p, e.target.value)}
+                      placeholder="Example: your GitLab username"
+                      size="small"
+                      fullWidth
+                    />
+                  );
+                }
                 return (
                   <TextField
                     key={p}
@@ -413,17 +613,47 @@ export default function TabsLayout() {
             <Divider />
             <CardContent>
               {/* Search Filter - Always visible when we have results */}
+              {/* MR state filter: Open / Merged / Closed - only for Merge Requests tab */}
+              {currentTab.key === 'mergeRequests' && baseResult?.items && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                    Filter by state (select one or more):
+                  </Typography>
+                  <ToggleButtonGroup
+                    value={['open', 'merged', 'closed'].filter(k => mrStateFilter[k])}
+                    onChange={(_, newValues) => {
+                      if (newValues === null) return;
+                      setMrStateFilter({
+                        open: newValues.includes('open'),
+                        merged: newValues.includes('merged'),
+                        closed: newValues.includes('closed'),
+                      });
+                      setFilteredResult(null);
+                    }}
+                    aria-label="MR state filter"
+                    sx={{ flexWrap: 'wrap', gap: 0.5 }}
+                  >
+                    <ToggleButton value="open" aria-label="Open">
+                      Open
+                    </ToggleButton>
+                    <ToggleButton value="merged" aria-label="Merged">
+                      Merged
+                    </ToggleButton>
+                    <ToggleButton value="closed" aria-label="Closed">
+                      Closed
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
+              )}
+
               {displayResult && displayResult.items && Array.isArray(displayResult.items) && (
                 <SearchFilter
-                  data={result?.items || displayResult.items}
+                  data={baseResult?.items ?? displayResult.items}
                   onFiltered={(filteredItems) => {
-                    // Always use the original result as base, not displayResult
-                    const originalResult = result || displayResult;
+                    const originalResult = baseResult || displayResult;
                     if (filteredItems && Array.isArray(filteredItems)) {
-                      // Update filtered result with filtered items
                       setFilteredResult({ ...originalResult, items: filteredItems });
                     } else {
-                      // If no filtered items, clear filter to show original
                       setFilteredResult(null);
                     }
                   }}
@@ -433,6 +663,45 @@ export default function TabsLayout() {
               )}
 
               {/* Results Display */}
+              {currentTab.key === 'teamMergeReport' && Array.isArray(displayResult.items) && displayResult.items.length > 0 && (
+                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 360, mb: 2 }}>
+                  <Table stickyHeader size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 700 }}>ID</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Title</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>State</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Author</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Merged By</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Source Branch</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Target Branch</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Created At</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Merged At</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>URL</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {displayResult.items.map((item) => (
+                        <TableRow key={`${item.id}-${item.web_url}`}>
+                          <TableCell>{item.id}</TableCell>
+                          <TableCell>{item.title}</TableCell>
+                          <TableCell>{item.state}</TableCell>
+                          <TableCell>{item.author?.name || item.author?.username || ''}</TableCell>
+                          <TableCell>{item.merged_by?.name || item.merged_by?.username || ''}</TableCell>
+                          <TableCell>{item.source_branch}</TableCell>
+                          <TableCell>{item.target_branch}</TableCell>
+                          <TableCell>{item.created_at}</TableCell>
+                          <TableCell>{item.merged_at}</TableCell>
+                          <TableCell>
+                            <a href={item.web_url} target="_blank" rel="noreferrer">Open</a>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+
               <Box sx={{ 
                 fontFamily: 'monospace', 
                 fontSize: 14, 

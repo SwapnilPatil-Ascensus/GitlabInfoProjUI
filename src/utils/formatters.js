@@ -172,7 +172,7 @@ export function formatResult(result, currentTab, params, projects) {
   let header = `===== Project: ${projectName} | Type: ${type} ${dateRange} ${total} ${statusBreakdown} =====\n`;
   
   // Format Merge Requests with enhanced details
-  if (type === 'Merge Requests' && Array.isArray(result.items)) {
+  if ((type === 'Merge Requests' || type === 'Team Merge Report') && Array.isArray(result.items)) {
     const items = result.items;
     const merged = items.filter(item => item.state && item.state.toLowerCase() === 'merged');
     const opened = items.filter(item => item.state && item.state.toLowerCase() === 'opened');

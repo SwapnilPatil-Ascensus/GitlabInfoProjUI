@@ -2,6 +2,8 @@
  * Export utilities for CSV and Excel
  */
 import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { convertToCSV, downloadFile } from './formatters';
 
 /**
@@ -49,6 +51,36 @@ export function exportToExcel(data, headers, filename = 'export.xlsx') {
 }
 
 /**
+ * Export data to PDF table
+ * @param {Array} data - Array of objects to export
+ * @param {Array} headers - Array of header objects with key, label, and optional transform
+ * @param {string} filename - Output filename
+ * @param {string} title - Report title
+ */
+export function exportToPDF(data, headers, filename = 'export.pdf', title = 'Report') {
+  const doc = new jsPDF({ orientation: 'landscape' });
+  doc.setFontSize(14);
+  doc.text(title, 14, 16);
+
+  const head = [headers.map((h) => h.label)];
+  const body = data.map((item) => headers.map((h) => {
+    const raw = h.transform ? h.transform(item[h.key]) : (item[h.key] ?? '');
+    return String(raw);
+  }));
+
+  autoTable(doc, {
+    head,
+    body,
+    startY: 22,
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [57, 73, 171] },
+    theme: 'striped',
+  });
+
+  doc.save(filename);
+}
+
+/**
  * Get export headers for merge requests
  */
 export function getMergeRequestHeaders() {
@@ -57,6 +89,7 @@ export function getMergeRequestHeaders() {
     { key: 'title', label: 'Title' },
     { key: 'state', label: 'State' },
     { key: 'author', label: 'Author', transform: (val) => val?.name || '' },
+    { key: 'merged_by', label: 'Merged By', transform: (val) => val?.name || '' },
     { key: 'source_branch', label: 'Source Branch' },
     { key: 'target_branch', label: 'Target Branch' },
     { key: 'created_at', label: 'Created At' },

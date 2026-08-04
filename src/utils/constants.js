@@ -24,11 +24,11 @@ export const PROJECTS = [
   { id: '61721493', name: 'deployment-monolith' },
   { id: '61345786', name: 'release-versions' },
   { id: '61227191', name: 'monolith' },
-  { id: '71904320', name: 'automation' },
-  { id: '111519404', name: 'qa-automation' },
-  { id: '71904329', name: 'api-test-automation' },
-  { id: '71904346', name: 'automation-shared-resource' },
-  { id: '71904336', name: 'prime-test-automation' },
+  { id: '71904320', name: 'automation - automation' },
+  { id: '71904329', name: 'automation - api-test-automation' },
+  { id: '71904346', name: 'automation - automation-shared-resource' },
+  { id: '71904336', name: 'automation - prime-test-automation' },
+  { id: 'qa-automation-group', name: '# qa-automation' },
   { id: '61183353', name: 'dev-monolith-migration' },
 ].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -69,6 +69,12 @@ export const TAB_CONFIG = [
     key: 'project', 
     params: ['project_id'],
     description: 'View project details including name, description, visibility, and activity information.'
+  },
+  {
+    label: 'Team Merge Report',
+    key: 'teamMergeReport',
+    params: ['project_id', 'start_date', 'end_date', 'team_members', 'target_branch', 'merged_by'],
+    description: 'Track merged merge requests by team members in a date range, with optional target branch and merged-by filters.'
   },
 ];
 

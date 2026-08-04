@@ -22,10 +22,40 @@ export default function ErrorAlert({ error, onClose }) {
   if (!error) return null;
 
   // Parse error message
+  const stringifyDetail = (detail) => {
+    if (detail == null) return '';
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+      return detail
+        .map((item) => {
+          if (typeof item === 'string') return item;
+          if (item?.msg) {
+            const loc = Array.isArray(item.loc) ? item.loc.join('.') : item.loc;
+            return loc ? `${loc}: ${item.msg}` : item.msg;
+          }
+          try {
+            return JSON.stringify(item);
+          } catch {
+            return String(item);
+          }
+        })
+        .join(' | ');
+    }
+    if (typeof detail === 'object') {
+      if (detail.msg) return detail.msg;
+      try {
+        return JSON.stringify(detail);
+      } catch {
+        return String(detail);
+      }
+    }
+    return String(detail);
+  };
+
   const getErrorMessage = (err) => {
     if (typeof err === 'string') return err;
-    if (err?.response?.data?.detail) return err.response.data.detail;
-    if (err?.response?.data?.error) return err.response.data.error;
+    if (err?.response?.data?.detail) return stringifyDetail(err.response.data.detail);
+    if (err?.response?.data?.error) return stringifyDetail(err.response.data.error);
     if (err?.message) return err.message;
     return 'An unexpected error occurred. Please try again.';
   };

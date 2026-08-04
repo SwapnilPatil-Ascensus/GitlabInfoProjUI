@@ -5,6 +5,7 @@
 import React, { useState } from 'react';
 import { Box, Button } from '@mui/material';
 import TabsLayout from './TabsLayout';
+import LeadershipDashboardPage from './pages/LeadershipDashboardPage';
 import ThemeProvider from './components/ThemeProvider';
 import AppHeader from './components/AppHeader';
 import AppFooter from './components/AppFooter';
@@ -13,7 +14,7 @@ import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 
 function App() {
-  const [currentView, setCurrentView] = useState('dashboard');
+  const [currentView, setCurrentView] = useState('leadership');
   const [tokenDialogOpen, setTokenDialogOpen] = useState(false);
 
   const handleAboutClick = () => {
@@ -29,11 +30,19 @@ function App() {
   };
 
   const handleBackToDashboard = () => {
-    setCurrentView('dashboard');
+    setCurrentView('leadership');
   };
 
   const handleHomeClick = () => {
-    setCurrentView('dashboard');
+    setCurrentView('leadership');
+  };
+
+  const handleDashboardClick = () => {
+    setCurrentView('leadership');
+  };
+
+  const handleReportingClick = () => {
+    setCurrentView('reporting');
   };
 
   return (
@@ -55,6 +64,9 @@ function App() {
           onContactClick={handleContactClick}
           onTokenClick={handleTokenClick}
           onHomeClick={handleHomeClick}
+          onDashboardClick={handleDashboardClick}
+          onReportingClick={handleReportingClick}
+          currentView={currentView}
         />
         
         <Box 
@@ -68,7 +80,8 @@ function App() {
             },
           }}
         >
-          {currentView === 'dashboard' && <TabsLayout />}
+          {currentView === 'leadership' && <LeadershipDashboardPage />}
+          {currentView === 'reporting' && <TabsLayout />}
           {currentView === 'about' && (
             <Box>
               <AboutPage />

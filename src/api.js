@@ -9,3 +9,6 @@ export const fetchBranches = (params) => axios.get(`${API_BASE}/branches`, { par
 export const fetchPipelines = (params) => axios.get(`${API_BASE}/pipelines`, { params });
 export const fetchUsers = (params) => axios.get(`${API_BASE}/users`, { params });
 export const fetchProject = (params) => axios.get(`${API_BASE}/project`, { params });
+export const fetchTeamMergeReport = (params) => axios.get(`${API_BASE}/team-merge-report`, { params });
+export const fetchTeamMembers = (params) => axios.get(`${API_BASE}/team-members`, { params });
+export const fetchUserWorkDashboard = (params) => axios.get(`${API_BASE}/user-work-dashboard`, { params });
