@@ -10,39 +10,39 @@ The GitLab Project Manager UI is a full-stack web application designed to connec
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Client Browser                           │
-│                  (React + Material-UI)                       │
+│                     Client Browser                          │
+│                  (React + Material-UI)                      │
 │                     Port: 3000                              │
 └──────────────────────┬──────────────────────────────────────┘
                        │ HTTP/REST API
                        │ (CORS enabled)
-┌──────────────────────▼──────────────────────────────────────┐
-│                  FastAPI Backend                            │
-│                    Port: 8000                               │
-│  ┌──────────────────────────────────────────────────────┐  │
-│  │  API Endpoints (main.py)                             │  │
-│  │  - /merge-requests                                   │  │
-│  │  - /commits                                         │  │
-│  │  - /branches                                        │  │
-│  │  - /pipelines                                       │  │
-│  │  - /users                                           │  │
-│  │  - /project                                         │  │
-│  └──────────────┬─────────────────────────────────────┘  │
+┌──────────────────────▼────────────────────────────────────┐
+│                  FastAPI Backend                          │
+│                    Port: 8000                             │
+│  ┌────────────────────────────────────────────────────┐   │
+│  │  API Endpoints (main.py)                           │   │
+│  │  - /merge-requests                                 │   │
+│  │  - /commits                                        │   │
+│  │  - /branches                                       │   │
+│  │  - /pipelines                                      │   │
+│  │  - /users                                          │   │
+│  │  - /project                                        │   │
+│  └──────────────┬─────────────────────────────────────┘   │
 │                 │                                         │
-│  ┌──────────────▼─────────────────────────────────────┐  │
-│  │  Data Models (models/)                              │  │
-│  │  - merge_request.py                                │  │
-│  │  - commit.py                                       │  │
-│  │  - branch.py                                       │  │
-│  │  - pipeline.py                                     │  │
-│  │  - user.py                                         │  │
-│  │  - project.py                                      │  │
-│  └──────────────┬─────────────────────────────────────┘  │
+│  ┌──────────────▼─────────────────────────────────────┐   │
+│  │  Data Models (models/)                             │   │
+│  │  - merge_request.py                                │   │
+│  │  - commit.py                                       │   │
+│  │  - branch.py                                       │   │
+│  │  - pipeline.py                                     │   │
+│  │  - user.py                                         │   │
+│  │  - project.py                                      │   │
+│  └──────────────┬─────────────────────────────────────┘   │
 └──────────────────┼──────────────────────────────────────┘
                    │ GitLab API v4
                    │ (HTTPS)
 ┌──────────────────▼──────────────────────────────────────┐
-│              GitLab.com API                              │
+│              GitLab.com API                             │
 │         (https://gitlab.com/api/v4)                     │
 └─────────────────────────────────────────────────────────┘
 ```
