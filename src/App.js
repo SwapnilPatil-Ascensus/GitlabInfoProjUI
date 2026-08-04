@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { Box, Button } from '@mui/material';
 import TabsLayout from './TabsLayout';
 import LeadershipDashboardPage from './pages/LeadershipDashboardPage';
+import GitLabUsagePage from './pages/GitLabUsagePage';
 import ThemeProvider from './components/ThemeProvider';
 import AppHeader from './components/AppHeader';
 import AppFooter from './components/AppFooter';
@@ -45,6 +46,10 @@ function App() {
     setCurrentView('reporting');
   };
 
+  const handleUsageClick = () => {
+    setCurrentView('usage');
+  };
+
   return (
     <ThemeProvider>
       <Box
@@ -66,6 +71,7 @@ function App() {
           onHomeClick={handleHomeClick}
           onDashboardClick={handleDashboardClick}
           onReportingClick={handleReportingClick}
+          onUsageClick={handleUsageClick}
           currentView={currentView}
         />
         
@@ -81,6 +87,7 @@ function App() {
           }}
         >
           {currentView === 'leadership' && <LeadershipDashboardPage />}
+          {currentView === 'usage' && <GitLabUsagePage />}
           {currentView === 'reporting' && <TabsLayout />}
           {currentView === 'about' && (
             <Box>

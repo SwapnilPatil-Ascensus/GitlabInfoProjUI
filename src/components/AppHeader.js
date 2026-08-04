@@ -28,6 +28,7 @@ export default function AppHeader({
   onHomeClick,
   onDashboardClick,
   onReportingClick,
+  onUsageClick,
   currentView,
 }) {
   return (
@@ -69,6 +70,14 @@ export default function AppHeader({
             }}
           >
             Reporting
+          </StyledButton>
+          <StyledButton
+            onClick={onUsageClick}
+            sx={{
+              bgcolor: currentView === 'usage' ? 'rgba(255,255,255,0.22)' : 'transparent',
+            }}
+          >
+            GitLab Usage
           </StyledButton>
           <StyledButton onClick={onTokenClick}>
             Manage Token

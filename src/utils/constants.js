@@ -70,12 +70,6 @@ export const TAB_CONFIG = [
     params: ['project_id'],
     description: 'View project details including name, description, visibility, and activity information.'
   },
-  {
-    label: 'Team Merge Report',
-    key: 'teamMergeReport',
-    params: ['project_id', 'start_date', 'end_date', 'team_members', 'target_branch', 'merged_by'],
-    description: 'Track merged merge requests by team members in a date range, with optional target branch and merged-by filters.'
-  },
 ];
 
 // Date preset options
