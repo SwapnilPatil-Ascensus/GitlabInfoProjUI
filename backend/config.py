@@ -43,6 +43,13 @@ class Settings:
     # Caching Configuration
     CACHE_ENABLED: bool = os.environ.get("CACHE_ENABLED", "true").lower() == "true"
     CACHE_TTL: int = int(os.environ.get("CACHE_TTL", "300"))  # 5 minutes default
+
+    # qTest Configuration
+    QTEST_BASE_URL: str = os.environ.get("QTEST_BASE_URL", "https://ascensus.qtestnet.com").rstrip("/")
+    QTEST_AUTH_HEADER: str = os.environ.get("QTEST_AUTH_HEADER", "").strip()
+    QTEST_BEARER_TOKEN: str = os.environ.get("QTEST_BEARER_TOKEN", "").strip()
+    QTEST_TOKEN: str = os.environ.get("QTEST_TOKEN", "").strip()
+    QTEST_PROJECT_ID: Optional[str] = os.environ.get("QTEST_PROJECT_ID", "").strip() or None
     
     # Logging Configuration
     LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
@@ -59,6 +66,21 @@ class Settings:
                 "GITLAB_TOKEN environment variable is required. "
                 "Please set it before starting the application."
             )
+
+    @classmethod
+    def get_qtest_auth_header(cls) -> str:
+        """Return a qTest Authorization header value without exposing secrets."""
+        if cls.QTEST_AUTH_HEADER:
+            return cls.QTEST_AUTH_HEADER
+        if cls.QTEST_BEARER_TOKEN:
+            if cls.QTEST_BEARER_TOKEN.lower().startswith("bearer "):
+                return cls.QTEST_BEARER_TOKEN
+            return f"bearer {cls.QTEST_BEARER_TOKEN}"
+        if cls.QTEST_TOKEN:
+            if cls.QTEST_TOKEN.lower().startswith("bearer "):
+                return cls.QTEST_TOKEN
+            return f"bearer {cls.QTEST_TOKEN}"
+        return ""
 
 
 @lru_cache()

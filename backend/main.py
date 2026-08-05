@@ -18,15 +18,19 @@ try:
     from backend.config import get_settings
     from backend.services.gitlab_service import GitLabService
     from backend.schemas.requests import DateRangeRequest, ProjectRequest, TeamMergeReportRequest, UserWorkDashboardRequest
+    from backend.schemas.qtest_requests import QTestProjectRequest, QTestQueryRequest, QTestCommentsRequest, QTestAttachmentsRequest
     from backend.utils.cache import get_cache
     from backend.utils.gitlab_client import get_gitlab_client, reset_gitlab_client
+    from backend.services.qtest_service import QTestService
 except ImportError:
     # Fall back to relative imports (when running from backend directory)
     from config import get_settings
     from services.gitlab_service import GitLabService
     from schemas.requests import DateRangeRequest, ProjectRequest, TeamMergeReportRequest, UserWorkDashboardRequest
+    from schemas.qtest_requests import QTestProjectRequest, QTestQueryRequest, QTestCommentsRequest, QTestAttachmentsRequest
     from utils.cache import get_cache
     from utils.gitlab_client import get_gitlab_client, reset_gitlab_client
+    from services.qtest_service import QTestService
 
 # Configure logging
 logging.basicConfig(
@@ -56,6 +60,7 @@ app.add_middleware(
 
 # Initialize service
 gitlab_service = GitLabService()
+qtest_service = QTestService()
 
 
 # Exception handlers
@@ -80,8 +85,122 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "cache_enabled": settings.CACHE_ENABLED
+        "cache_enabled": settings.CACHE_ENABLED,
+        "qtest_configured": qtest_service.is_configured(),
     }
+
+
+@app.get("/qtest/projects")
+async def qtest_list_projects():
+    """List qTest projects available to the configured account."""
+    try:
+        if not qtest_service.is_configured():
+            raise HTTPException(status_code=400, detail="QTEST_AUTH_HEADER or QTEST_TOKEN must be set")
+        data = qtest_service.list_projects()
+        return {"items": data, "count": len(data) if isinstance(data, list) else 0, "timestamp": datetime.utcnow().isoformat()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error listing qTest projects: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to list qTest projects: {str(e)}")
+
+
+@app.get("/qtest/projects/{project_id}/permissions")
+async def qtest_project_permissions(project_id: int):
+    """Get current user permissions for a qTest project."""
+    try:
+        request_data = QTestProjectRequest(project_id=project_id)
+        data = qtest_service.get_current_user_permissions(request_data.project_id)
+        return {**data, "timestamp": datetime.utcnow().isoformat()}
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error fetching qTest permissions: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch qTest permissions: {str(e)}")
+
+
+@app.post("/qtest/projects/{project_id}/query")
+async def qtest_query_objects(project_id: int, request: QTestQueryRequest):
+    """Run a qTest query for requirements, test cases, test runs, or defects."""
+    try:
+        if request.project_id != project_id:
+            raise HTTPException(status_code=400, detail="Path project_id must match request body project_id")
+        data = qtest_service.query_objects(
+            project_id=request.project_id,
+            object_type=request.object_type,
+            fields=request.fields,
+            query=request.query,
+            page=request.page,
+            page_size=request.page_size,
+        )
+        return {**data, "timestamp": datetime.utcnow().isoformat()}
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error querying qTest objects: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to query qTest objects: {str(e)}")
+
+
+@app.post("/qtest/projects/{project_id}/comments")
+async def qtest_query_comments(project_id: int, request: QTestCommentsRequest):
+    """Query qTest comments for requirements, test cases, test runs, or defects."""
+    try:
+        if request.project_id != project_id:
+            raise HTTPException(status_code=400, detail="Path project_id must match request body project_id")
+        data = qtest_service.query_comments(
+            project_id=request.project_id,
+            object_type=request.object_type,
+            object_id=request.object,
+            authors=request.authors,
+            start=request.start,
+            end=request.end,
+        )
+        return {**data, "timestamp": datetime.utcnow().isoformat()}
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error querying qTest comments: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to query qTest comments: {str(e)}")
+
+
+@app.get("/qtest/projects/{project_id}/attachments")
+async def qtest_query_attachments(
+    project_id: int,
+    type: str = Query(..., description="Artifact type"),
+    ids: Optional[str] = Query(None, description="Comma-separated object ids"),
+    author: Optional[str] = Query(None, description="Author id"),
+    createdDate: Optional[str] = Query(None, description="Created date filter"),
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(100, ge=1, le=100),
+):
+    """Query qTest attachments for supported object types."""
+    try:
+        request_data = QTestAttachmentsRequest(
+            project_id=project_id,
+            type=type,
+            ids=ids,
+            author=author,
+            createdDate=createdDate,
+        )
+        data = qtest_service.query_attachments(
+            project_id=request_data.project_id,
+            attachment_type=request_data.type,
+            ids=request_data.ids,
+            author=request_data.author,
+            created_date=request_data.createdDate,
+            page=page,
+            page_size=pageSize,
+        )
+        return {**data, "timestamp": datetime.utcnow().isoformat()}
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error querying qTest attachments: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to query qTest attachments: {str(e)}")
 
 
 # Cache management endpoints
