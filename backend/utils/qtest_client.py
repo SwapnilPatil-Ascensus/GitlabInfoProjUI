@@ -14,6 +14,24 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+try:
+    import urllib3
+except ImportError:
+    urllib3 = None
+
+
+def _disable_ssl_warnings() -> None:
+    if urllib3 is not None:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+try:
+    settings = get_settings()
+    if not settings.QTEST_VERIFY_SSL:
+        _disable_ssl_warnings()
+except Exception:
+    _disable_ssl_warnings()
+
 
 class QTestClient:
     """Shared qTest API client for authenticated requests."""
@@ -22,6 +40,7 @@ class QTestClient:
         self.settings = get_settings()
         self.base_url = self.settings.QTEST_BASE_URL
         self.authorization = self.settings.get_qtest_auth_header()
+        self.verify_ssl = self.settings.QTEST_VERIFY_SSL
         self.headers = {
             "Authorization": self.authorization,
             "Accept": "application/json",
@@ -49,6 +68,7 @@ class QTestClient:
                     method,
                     url,
                     headers=self.get_headers(),
+                    verify=self.verify_ssl,
                     timeout=timeout,
                     **kwargs,
                 )

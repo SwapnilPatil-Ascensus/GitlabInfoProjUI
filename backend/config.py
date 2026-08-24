@@ -7,13 +7,18 @@ from pathlib import Path
 from typing import List, Optional
 from functools import lru_cache
 
-# Load environment variables from .env file
+# Load environment variables from local env files
 try:
     from dotenv import load_dotenv
-    # Load .env file from project root (parent of backend directory)
-    env_path = Path(__file__).parent.parent / '.env'
+    project_root = Path(__file__).parent.parent
+    local_env_path = project_root / '.env.local'
+    env_path = project_root / '.env'
+
     if env_path.exists():
         load_dotenv(dotenv_path=env_path, override=True)
+
+    if local_env_path.exists():
+        load_dotenv(dotenv_path=local_env_path, override=True)
     else:
         # Try loading from current directory as fallback
         load_dotenv(override=True)
@@ -50,6 +55,7 @@ class Settings:
     QTEST_BEARER_TOKEN: str = os.environ.get("QTEST_BEARER_TOKEN", "").strip()
     QTEST_TOKEN: str = os.environ.get("QTEST_TOKEN", "").strip()
     QTEST_PROJECT_ID: Optional[str] = os.environ.get("QTEST_PROJECT_ID", "").strip() or None
+    QTEST_VERIFY_SSL: bool = os.environ.get("QTEST_VERIFY_SSL", "false").lower() == "true"
     
     # Logging Configuration
     LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")

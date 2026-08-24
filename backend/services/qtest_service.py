@@ -36,12 +36,13 @@ class QTestService:
         page: int = 1,
         page_size: int = 100,
     ) -> Dict[str, Any]:
+        # qTest /search rejects empty queries with: "query statement must not be null!"
+        resolved_query = (query or "").strip() or "name ~ '%'"
         payload = {
             "object_type": object_type,
             "fields": fields or ["*"],
+            "query": resolved_query,
         }
-        if query:
-            payload["query"] = query
 
         return self.client.post(
             f"api/v3/projects/{project_id}/search",

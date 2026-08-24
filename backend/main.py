@@ -203,6 +203,60 @@ async def qtest_query_attachments(
         raise HTTPException(status_code=500, detail=f"Failed to query qTest attachments: {str(e)}")
 
 
+@app.post("/qtest/projects/{project_id}/histories")
+async def qtest_query_histories(
+    project_id: int,
+    object_type: str = Body(..., embed=True),
+    object_query: Optional[str] = Body(None, embed=True),
+    query: Optional[str] = Body(None, embed=True),
+    fields: Optional[list] = Body(default_factory=lambda: ["*"] , embed=True),
+    page: int = Body(1, embed=True),
+    pageSize: int = Body(100, embed=True),
+):
+    """Query qTest history records for requirements, test cases, test runs, or defects."""
+    try:
+        request_data = QTestQueryRequest(project_id=project_id, object_type=object_type, fields=fields, query=object_query)
+        data = qtest_service.client.post(
+            f"api/v3/projects/{request_data.project_id}/histories",
+            json_body={
+                "object_type": request_data.object_type,
+                "fields": request_data.fields,
+                **({"object_query": object_query} if object_query else {}),
+                **({"query": query} if query else {}),
+            },
+            params={"page": page, "pageSize": pageSize},
+        )
+        return {**data, "timestamp": datetime.utcnow().isoformat()}
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error querying qTest histories: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to query qTest histories: {str(e)}")
+
+
+@app.get("/qtest/projects/{project_id}/linked-artifacts")
+async def qtest_linked_artifacts(
+    project_id: int,
+    type: str = Query(..., description="Source object type"),
+    ids: str = Query(..., description="Comma-separated artifact ids"),
+):
+    """Retrieve objects linked to qTest artifacts."""
+    try:
+        request_data = QTestProjectRequest(project_id=project_id)
+        data = qtest_service.client.get(
+            f"api/v3/projects/{request_data.project_id}/linked-artifacts",
+            params={"type": type, "ids": ids},
+        )
+        return {"items": data, "count": len(data) if isinstance(data, list) else 0, "timestamp": datetime.utcnow().isoformat()}
+    except ValueError as e:
+        logger.warning(f"Validation error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error fetching qTest linked artifacts: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch qTest linked artifacts: {str(e)}")
+
+
 # Cache management endpoints
 @app.post("/cache/clear")
 async def clear_cache():

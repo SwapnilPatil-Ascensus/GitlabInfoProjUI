@@ -71,6 +71,9 @@ python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
 $env:GITLAB_TOKEN="your-gitlab-token-here"
+$env:QTEST_BEARER_TOKEN="your-qtest-token-here"
+$env:QTEST_BASE_URL="https://ascensus.qtestnet.com"
+$env:QTEST_VERIFY_SSL="false"
 cd ..
 python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
@@ -82,11 +85,28 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 export GITLAB_TOKEN="your-gitlab-token-here"
+export QTEST_BEARER_TOKEN="your-qtest-token-here"
+export QTEST_BASE_URL="https://ascensus.qtestnet.com"
+export QTEST_VERIFY_SSL="false"
 cd ..
 python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 > **💡 Tip**: To set the token permanently on Windows, use: `setx GITLAB_TOKEN "your-token"` (then restart terminal)
+
+### qTest Local Setup
+
+For local qTest access, create a file named [`.env.local`](.env.local) in the repository root and add your qTest values there. The backend loads `.env.local` first, then `.env`, so local overrides stay on your machine.
+
+Minimum qTest entries:
+
+```powershell
+QTEST_BASE_URL=https://ascensus.qtestnet.com
+QTEST_BEARER_TOKEN=your-qtest-token-here
+QTEST_VERIFY_SSL=false
+```
+
+If qTest is using a trusted certificate chain in your environment, you can set `QTEST_VERIFY_SSL=true` instead.
 
 ### Step 3: Set Up Frontend (Terminal 2)
 
